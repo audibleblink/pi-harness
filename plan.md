@@ -26,18 +26,18 @@ The repo has no automated test suite. Each phase therefore defines an **autonomo
 
 ### Tasks
 
-- [ ] Add `tsconfig.json` at repo root if absent, covering `extensions/**/*.ts`, `noEmit: true`, `strict: true`, matching the style pi expects (peek at `node_modules/@mariozechner/pi-coding-agent` for ambient types if needed).
-- [ ] Add `scripts/check-build.sh`: runs `npx tsc --noEmit -p .` and exits non-zero on error.
-- [ ] Add `scripts/check-invariants.sh`: contains all final DoD greps from PRD §6 wrapped as `rg` calls with expected counts. In Phase 0 it is allowed to **fail** (we record a baseline). Each later phase tightens one invariant.
-- [ ] Add `scripts/smoke.sh`: launches `pi` with `PI_HARNESS_DEBUG=1` against a throwaway session dir, drives it through scenarios S1–S8 from PRD §6 using a `.expect`/heredoc-style script, captures stdout+stderr, and greps for required markers. In Phase 0 it asserts only the **current** behavior (mode banner, undo status, working indicator, custom editor). New markers are added as later phases land.
-- [ ] Add a `harness:debug` event helper that `console.error`s `PI_DBG slot=… kind=…` lines when `PI_HARNESS_DEBUG=1`. Place it in `extensions/_debug.ts` (deleted in the final phase). Wire it into `zentui.ts`, `modes.ts`, `pi-undo-redo.ts`, `working-messages.ts`, `pi-subagents/ui/agent-widget.ts`, `pi-tasks/ui/task-widget.ts` — one-line emission per render so smoke can assert.
-- [ ] Commit. Tag baseline: `git tag refactor-baseline`.
+- [x] Add `tsconfig.json` at repo root if absent, covering `extensions/**/*.ts`, `noEmit: true`, `strict: true`, matching the style pi expects (peek at `node_modules/@mariozechner/pi-coding-agent` for ambient types if needed).
+- [x] Add `scripts/check-build.sh`: runs `npx tsc --noEmit -p .` and exits non-zero on error.
+- [x] Add `scripts/check-invariants.sh`: contains all final DoD greps from PRD §6 wrapped as `rg` calls with expected counts. In Phase 0 it is allowed to **fail** (we record a baseline). Each later phase tightens one invariant.
+- [x] Add `scripts/smoke.sh`: launches `pi` with `PI_HARNESS_DEBUG=1` against a throwaway session dir, drives it through scenarios S1–S8 from PRD §6 using a `.expect`/heredoc-style script, captures stdout+stderr, and greps for required markers. In Phase 0 it asserts only the **current** behavior (mode banner, undo status, working indicator, custom editor). New markers are added as later phases land.
+- [x] Add a `harness:debug` event helper that `console.error`s `PI_DBG slot=… kind=…` lines when `PI_HARNESS_DEBUG=1`. Place it in `extensions/_debug.ts` (deleted in the final phase). Wire it into `zentui.ts`, `modes.ts`, `pi-undo-redo.ts`, `working-messages.ts`, `pi-subagents/ui/agent-widget.ts`, `pi-tasks/ui/task-widget.ts` — one-line emission per render so smoke can assert.
+- [x] Commit. Tag baseline: `git tag refactor-baseline`.
 
 ### Done when
 
-- [ ] `bash scripts/check-build.sh` exits 0.
-- [ ] `bash scripts/smoke.sh` exits 0 against the **current** unrefactored code (S1, S2, S6, S7 markers detected).
-- [ ] `bash scripts/check-invariants.sh` runs and prints a baseline report (does not need to pass yet — used as before/after diff).
+- [x] `bash scripts/check-build.sh` exits 0.
+- [x] `bash scripts/smoke.sh` exits 0 against the **current** unrefactored code (S1, S2, S6, S7 markers detected).
+- [x] `bash scripts/check-invariants.sh` runs and prints a baseline report (does not need to pass yet — used as before/after diff).
 
 ---
 
@@ -48,18 +48,18 @@ The repo has no automated test suite. Each phase therefore defines an **autonomo
 
 ### Tasks
 
-- [ ] Create `extensions/ui/bus.ts`. Defines the envelope `{ slot: string; value: unknown }`, the topic name `harness.ui:publish`, and typed producer helpers: `publishMode`, `publishUndo`, `publishOrchestration`, `publishWorking`. Each helper is a one-liner that calls `pi.events.emit(TOPIC, { slot, value })`. Importing `bus.ts` does **not** require ui to be loaded; emission is fire-and-forget.
-- [ ] Create `extensions/ui/index.ts`. Registers as a pi extension. On activate: subscribes to `harness.ui:publish`, maintains `slots: Map<string, unknown>`, on each publish stores or deletes (when value is `null`/`undefined`), then triggers a debounced re-render hook (initially a no-op that just logs `PI_DBG ui:slot-changed slot=…`). On `session_start` with `reason: "reload"`: clears slots. On `session_shutdown`: unsubscribes.
-- [ ] Decide slot names (PRD §9 deferred): `mode`, `undo`, `orchestration`, `working`. Document them in `extensions/ui/bus.ts` as a const map.
-- [ ] Register `extensions/ui/` in whatever pi extension manifest the harness uses (check `extensions/index` or pi config). Do **not** delete `zentui.ts` / `working-messages.ts` yet.
-- [ ] Add new smoke marker: when ui receives a publish, it logs `PI_DBG ui:received slot=…`. This is what later phases will assert on.
+- [x] Create `extensions/ui/bus.ts`. Defines the envelope `{ slot: string; value: unknown }`, the topic name `harness.ui:publish`, and typed producer helpers: `publishMode`, `publishUndo`, `publishOrchestration`, `publishWorking`. Each helper is a one-liner that calls `pi.events.emit(TOPIC, { slot, value })`. Importing `bus.ts` does **not** require ui to be loaded; emission is fire-and-forget.
+- [x] Create `extensions/ui/index.ts`. Registers as a pi extension. On activate: subscribes to `harness.ui:publish`, maintains `slots: Map<string, unknown>`, on each publish stores or deletes (when value is `null`/`undefined`), then triggers a debounced re-render hook (initially a no-op that just logs `PI_DBG ui:slot-changed slot=…`). On `session_start` with `reason: "reload"`: clears slots. On `session_shutdown`: unsubscribes.
+- [x] Decide slot names (PRD §9 deferred): `mode`, `undo`, `orchestration`, `working`. Document them in `extensions/ui/bus.ts` as a const map.
+- [x] Register `extensions/ui/` in whatever pi extension manifest the harness uses (check `extensions/index` or pi config). Do **not** delete `zentui.ts` / `working-messages.ts` yet.
+- [x] Add new smoke marker: when ui receives a publish, it logs `PI_DBG ui:received slot=…`. This is what later phases will assert on.
 
 ### Verification (autonomous)
 
-- [ ] `bash scripts/check-build.sh` passes.
-- [ ] `bash scripts/smoke.sh` still asserts S1, S2, S6, S7 markers from the **old** path (they haven't moved yet).
-- [ ] New assertion: a unit-style probe inside `smoke.sh` calls `publishMode({label:"X"})` from a one-shot extension hook and greps for `PI_DBG ui:received slot=mode`. If absent, smoke fails.
-- [ ] `rg -n "harness.ui:publish" extensions/` shows the topic only in `extensions/ui/bus.ts` and `extensions/ui/index.ts`.
+- [x] `bash scripts/check-build.sh` passes.
+- [x] `bash scripts/smoke.sh` still asserts S1, S2, S6, S7 markers from the **old** path (they haven't moved yet).
+- [x] New assertion: a unit-style probe inside `smoke.sh` calls `publishMode({label:"X"})` from a one-shot extension hook and greps for `PI_DBG ui:received slot=mode`. If absent, smoke fails.
+- [x] `rg -n "harness.ui:publish" extensions/` shows the topic only in `extensions/ui/bus.ts` and `extensions/ui/index.ts`.
 
 ---
 
@@ -72,15 +72,15 @@ The repo has no automated test suite. Each phase therefore defines an **autonomo
 
 ### Tasks
 
-- [ ] In `extensions/modes.ts`, around lines 349–356: keep the existing `ctx.ui.setStatus(AGENT_BANNER_WIDGET, …)` calls, **and** add `publishMode({ label, model })` (or `publishMode(null)` for the clear case). Import from `./ui/bus.ts`.
-- [ ] In `extensions/pi-undo-redo.ts` lines 342 and 958: same pattern — add `publishUndo(state)` / `publishUndo(null)` next to the existing `setStatus` calls. The exact `UndoState` shape mirrors what `STATUS_WIDGET_ID` text encodes (counters, icon hints) so ui can re-render identical text in Phase 4.
-- [ ] Both files: do **not** remove `setStatus` yet, do **not** remove the `STATUS_WIDGET_ID` / `AGENT_BANNER_WIDGET` constants. That happens in Phase 4.
+- [x] In `extensions/modes.ts`, around lines 349–356: keep the existing `ctx.ui.setStatus(AGENT_BANNER_WIDGET, …)` calls, **and** add `publishMode({ label, model })` (or `publishMode(null)` for the clear case). Import from `./ui/bus.ts`.
+- [x] In `extensions/pi-undo-redo.ts` lines 342 and 958: same pattern — add `publishUndo(state)` / `publishUndo(null)` next to the existing `setStatus` calls. The exact `UndoState` shape mirrors what `STATUS_WIDGET_ID` text encodes (counters, icon hints) so ui can re-render identical text in Phase 4.
+- [x] Both files: do **not** remove `setStatus` yet, do **not** remove the `STATUS_WIDGET_ID` / `AGENT_BANNER_WIDGET` constants. That happens in Phase 4.
 
 ### Verification
 
-- [ ] `bash scripts/check-build.sh` passes.
-- [ ] `bash scripts/smoke.sh`: scenarios S1 and S2 still pass via the old footer. **Additionally** assert that `PI_DBG ui:received slot=mode` and `PI_DBG ui:received slot=undo` appear during S1/S2. If they don't, Phase 2 is incomplete.
-- [ ] `rg -n "publishMode|publishUndo" extensions/` shows hits in exactly `modes.ts`, `pi-undo-redo.ts`, and `extensions/ui/bus.ts`.
+- [x] `bash scripts/check-build.sh` passes.
+- [x] `bash scripts/smoke.sh`: scenarios S1 and S2 still pass via the old footer. **Additionally** assert that `PI_DBG ui:received slot=mode` and `PI_DBG ui:received slot=undo` appear during S1/S2. If they don't, Phase 2 is incomplete.
+- [x] `rg -n "publishMode|publishUndo" extensions/` shows hits in exactly `modes.ts`, `pi-undo-redo.ts`, and `extensions/ui/bus.ts`.
 
 ---
 
@@ -91,20 +91,20 @@ The repo has no automated test suite. Each phase therefore defines an **autonomo
 
 ### Tasks
 
-- [ ] Create `extensions/ui/footer.ts`. Lift the `setFooter(...)` body from `zentui.ts` lines ~824–900 verbatim, then replace its input source: instead of reading `extStatuses` keyed on `AGENT_STATUS_KEY` / `UNDO_STATUS_KEY`, read from ui's `slots` map (`slots.get("mode")`, `slots.get("undo")`). For "extra" status texts that aren't mode/undo, keep them flowing from the existing `extStatuses` channel for now — those are residual `setStatus` callers that will disappear once orchestration also migrates.
-- [ ] Create `extensions/ui/editor.ts`. Lift `editorFactory` and the `setEditorComponent` registration from `zentui.ts` lines ~920–930. ui calls `setEditorComponent(editorFactory)` on activate.
-- [ ] Create `extensions/ui/working.ts`. Lift the entire body of `working-messages.ts` (132 lines) verbatim. ui calls `setWorkingMessage` / `setWorkingIndicator` from inside ui, which is allowed because ui owns chrome. Preserve the message pool and the random pick logic exactly.
-- [ ] Reduce `extensions/zentui.ts`: delete `setFooter` block, the editor factory, and the two hardcoded status-key constants (`AGENT_STATUS_KEY`, `UNDO_STATUS_KEY`). What remains of `zentui.ts` should be either (a) zero non-trivial code (file deleted), or (b) any keymap/theme-only logic that wasn't chrome. Inspect the file end-to-end and decide. Per PRD §4.1 the file should be deleted entirely — confirm nothing else is hiding in there.
-- [ ] Reduce `extensions/working-messages.ts`: delete the file. Unregister it from the extension manifest.
-- [ ] Remove the dual-publish from Phase 2: in `modes.ts` and `pi-undo-redo.ts`, delete the `setStatus(...)` lines and the now-unused status-key constants. **Only** the `publishMode/publishUndo` calls remain.
+- [x] Create `extensions/ui/footer.ts`. Lift the `setFooter(...)` body from `zentui.ts` lines ~824–900 verbatim, then replace its input source: instead of reading `extStatuses` keyed on `AGENT_STATUS_KEY` / `UNDO_STATUS_KEY`, read from ui's `slots` map (`slots.get("mode")`, `slots.get("undo")`). For "extra" status texts that aren't mode/undo, keep them flowing from the existing `extStatuses` channel for now — those are residual `setStatus` callers that will disappear once orchestration also migrates.
+- [x] Create `extensions/ui/editor.ts`. Lift `editorFactory` and the `setEditorComponent` registration from `zentui.ts` lines ~920–930. ui calls `setEditorComponent(editorFactory)` on activate.
+- [x] Create `extensions/ui/working.ts`. Lift the entire body of `working-messages.ts` (132 lines) verbatim. ui calls `setWorkingMessage` / `setWorkingIndicator` from inside ui, which is allowed because ui owns chrome. Preserve the message pool and the random pick logic exactly.
+- [x] Reduce `extensions/zentui.ts`: delete `setFooter` block, the editor factory, and the two hardcoded status-key constants (`AGENT_STATUS_KEY`, `UNDO_STATUS_KEY`). What remains of `zentui.ts` should be either (a) zero non-trivial code (file deleted), or (b) any keymap/theme-only logic that wasn't chrome. Inspect the file end-to-end and decide. Per PRD §4.1 the file should be deleted entirely — confirm nothing else is hiding in there.
+- [x] Reduce `extensions/working-messages.ts`: delete the file. Unregister it from the extension manifest.
+- [x] Remove the dual-publish from Phase 2: in `modes.ts` and `pi-undo-redo.ts`, delete the `setStatus(...)` lines and the now-unused status-key constants. **Only** the `publishMode/publishUndo` calls remain.
 
 ### Verification
 
-- [ ] `bash scripts/check-build.sh` passes.
-- [ ] `rg -n "setFooter\(|setEditorComponent\(|setWorkingMessage\(|setWorkingIndicator\(" extensions/` returns hits **only** under `extensions/ui/`. Encode in `check-invariants.sh`.
-- [ ] `rg -n "setStatus\(" extensions/` still has hits — but only from `pi-subagents/` / `pi-tasks/` (those migrate in Phase 5). Document the remaining count; it must monotonically decrease.
-- [ ] `ls extensions/zentui.ts extensions/working-messages.ts 2>/dev/null` returns empty.
-- [ ] `bash scripts/smoke.sh`: S1, S2, S6, S7 all pass through the new ui code path (assert `PI_DBG ui:rendered-footer`, `PI_DBG ui:editor-installed`, `PI_DBG ui:working-tick` markers).
+- [x] `bash scripts/check-build.sh` passes.
+- [x] `rg -n "setFooter\(|setEditorComponent\(|setWorkingMessage\(|setWorkingIndicator\(" extensions/` returns hits **only** under `extensions/ui/`. Encode in `check-invariants.sh`.
+- [x] `rg -n "setStatus\(" extensions/` still has hits — but only from `pi-subagents/` / `pi-tasks/` (those migrate in Phase 5). Document the remaining count; it must monotonically decrease.
+- [x] `ls extensions/zentui.ts extensions/working-messages.ts 2>/dev/null` returns empty.
+- [x] `bash scripts/smoke.sh`: S1, S2, S6, S7 all pass through the new ui code path (assert `PI_DBG ui:rendered-footer`, `PI_DBG ui:editor-installed`, `PI_DBG ui:working-tick` markers).
 
 ---
 
@@ -117,44 +117,44 @@ The repo has no automated test suite. Each phase therefore defines an **autonomo
 
 ### Tasks (collapse pi-subagents → orchestration)
 
-- [ ] Create `extensions/orchestration/` directory.
-- [ ] Move every file from `extensions/pi-subagents/` (except `cross-extension-rpc.ts`, `ui/agent-widget.ts`) into `extensions/orchestration/` flat layout per PRD §4.1. Move `ui/conversation-viewer.ts` to `extensions/orchestration/conversation-viewer.ts`.
-- [ ] Delete `extensions/pi-subagents/cross-extension-rpc.ts`.
-- [ ] In `extensions/orchestration/index.ts` (was `pi-subagents/index.ts`), delete:
+- [x] Create `extensions/orchestration/` directory.
+- [x] Move every file from `extensions/pi-subagents/` (except `cross-extension-rpc.ts`, `ui/agent-widget.ts`) into `extensions/orchestration/` flat layout per PRD §4.1. Move `ui/conversation-viewer.ts` to `extensions/orchestration/conversation-viewer.ts`.
+- [x] Delete `extensions/pi-subagents/cross-extension-rpc.ts`.
+- [x] In `extensions/orchestration/index.ts` (was `pi-subagents/index.ts`), delete:
   - The `Symbol.for("pi-subagents:manager")` block (around line 409–435).
   - All `pi.events.emit("subagents:…")` calls (started/completed/failed/created/steered/ready). Their consumers move into the same module; they become direct method calls on `agentManager`.
   - The `subagentsAvailable` flag and the protocol-version handshake.
-- [ ] Keep `agentManager.cleanupInterval` (line 77) — it is not the widget ticker, it's a 60s GC sweep. Note it in the `setInterval` audit (DoD #3).
+- [x] Keep `agentManager.cleanupInterval` (line 77) — it is not the widget ticker, it's a 60s GC sweep. Note it in the `setInterval` audit (DoD #3).
 
 ### Tasks (collapse pi-tasks → orchestration)
 
-- [ ] Move every file from `extensions/pi-tasks/` (except `ui/task-widget.ts`) into `extensions/orchestration/`. Move `ui/settings-menu.ts` to `extensions/orchestration/settings-menu.ts`.
-- [ ] In what was `pi-tasks/index.ts`:
+- [x] Move every file from `extensions/pi-tasks/` (except `ui/task-widget.ts`) into `extensions/orchestration/`. Move `ui/settings-menu.ts` to `extensions/orchestration/settings-menu.ts`.
+- [x] In what was `pi-tasks/index.ts`:
   - Delete `rpcCall`, `checkSubagentsVersion`, the `subagents:rpc:*` emits/listens (lines 120, 126, 138, 156, 160).
   - Replace the `pi.events.on("subagents:completed" | "subagents:failed", …)` handlers with **direct callbacks** registered on the agent manager. The agent manager exposes `onAgentCompleted(cb)` / `onAgentFailed(cb)` (already exists internally — wire to it).
   - Delete the inner `unsubOk`/`unsubFail` event subscriptions inside the spawn helper (lines 752–755). Replace with a promise that resolves from the manager's direct completion callback for that agent id.
-- [ ] Unify state: there is now **one** `agentTaskMap` in `orchestration/index.ts`. Delete the duplicate that was on the pi-tasks side.
+- [x] Unify state: there is now **one** `agentTaskMap` in `orchestration/index.ts`. Delete the duplicate that was on the pi-tasks side.
 
 ### Tasks (orchestration index wiring)
 
-- [ ] In `extensions/orchestration/index.ts`, the `activate` hook:
+- [x] In `extensions/orchestration/index.ts`, the `activate` hook:
   - Constructs `AgentManager`, `TaskStore`, `ProcessTracker` directly.
   - Registers task tools (was `pi-tasks/index.ts`) and agent tools (was `pi-subagents/index.ts`) — all in one extension's tool list.
   - Registers `session_shutdown` to clear `cleanupInterval`, the spinner interval (line 915), the stop poll loop, and any TaskStore timers.
-- [ ] Add a single `publishOrchestration(buildState())` call wherever state changes (agent created/updated/completed, task created/updated/completed, cascade link added/removed). Bracket the publish behind a tiny dirty-flag debouncer (microtask) so a single user action doesn't fan out 10 publishes.
-- [ ] In Phase 4 the publish is purely diagnostic: ui will log `PI_DBG ui:received slot=orchestration agents=N tasks=M` but render nothing.
-- [ ] Delete `extensions/pi-subagents/` and `extensions/pi-tasks/` directories.
-- [ ] Remove the old extension entries from the harness manifest; add `extensions/orchestration/`.
+- [x] Add a single `publishOrchestration(buildState())` call wherever state changes (agent created/updated/completed, task created/updated/completed, cascade link added/removed). Bracket the publish behind a tiny dirty-flag debouncer (microtask) so a single user action doesn't fan out 10 publishes.
+- [x] In Phase 4 the publish is purely diagnostic: ui will log `PI_DBG ui:received slot=orchestration agents=N tasks=M` but render nothing.
+- [x] Delete `extensions/pi-subagents/` and `extensions/pi-tasks/` directories.
+- [x] Remove the old extension entries from the harness manifest; add `extensions/orchestration/`.
 
 ### Verification
 
-- [ ] `bash scripts/check-build.sh` passes.
-- [ ] `rg -n "Symbol\.for\(\"pi-subagents:" extensions/` → 0 hits.
-- [ ] `rg -n "subagents:" extensions/ -g '*.ts'` → 0 hits.
-- [ ] `rg -n "cross-extension-rpc|rpcCall|subagentsAvailable" extensions/` → 0 hits.
-- [ ] `ls extensions/pi-subagents extensions/pi-tasks 2>/dev/null` → empty.
-- [ ] `rg -n "agentTaskMap" extensions/` → hits in **one** file only (`extensions/orchestration/index.ts` or its dedicated state module).
-- [ ] `bash scripts/smoke.sh` runs S3, S4, S5 with widgets disabled and asserts only that lifecycle markers fire (`PI_DBG orch:agent-created`, `PI_DBG orch:agent-completed`, `PI_DBG orch:task-transition`, `PI_DBG ui:received slot=orchestration`). No visual widget yet — that's Phase 5. S1, S2, S6, S7 still pass.
+- [x] `bash scripts/check-build.sh` passes.
+- [x] `rg -n "Symbol\.for\(\"pi-subagents:" extensions/` → 0 hits.
+- [x] `rg -n "subagents:" extensions/ -g '*.ts'` → 0 hits.
+- [x] `rg -n "cross-extension-rpc|rpcCall|subagentsAvailable" extensions/` → 0 hits.
+- [x] `ls extensions/pi-subagents extensions/pi-tasks 2>/dev/null` → empty.
+- [x] `rg -n "agentTaskMap" extensions/` → hits in **one** file only (`extensions/orchestration/index.ts` or its dedicated state module).
+- [x] `bash scripts/smoke.sh` runs S3, S4, S5 with widgets disabled and asserts only that lifecycle markers fire (`PI_DBG orch:agent-created`, `PI_DBG orch:agent-completed`, `PI_DBG orch:task-transition`, `PI_DBG ui:received slot=orchestration`). No visual widget yet — that's Phase 5. S1, S2, S6, S7 still pass.
 
 ---
 
@@ -165,19 +165,19 @@ The repo has no automated test suite. Each phase therefore defines an **autonomo
 
 ### Tasks
 
-- [ ] Create `extensions/ui/widget.ts`. It is the consumer of `slots.orchestration`. Its render output is whatever `OrchestrationState` describes: list of active agents (with per-agent metrics: status, elapsed, current activity, model badge), list of active tasks (with status, owner, cascade link to agent if any), and any cascade hint lines. Visual layout: agents-above-tasks (PRD §9 default), grouped by cascade link.
-- [ ] Lift the rendering helpers (color/badge/elapsed-formatter/spinner-frame logic) from `pi-subagents/ui/agent-widget.ts` and `pi-tasks/ui/task-widget.ts` into `extensions/ui/widget.ts`. Where they overlap, dedupe — preserving exact visual output.
-- [ ] Create `extensions/ui/ticker.ts`. Single `setInterval(80)`. Only runs when `slots.orchestration` has at least one active agent or task with an animated state (spinner/elapsed). Auto-stops when the slot is empty/idle. On each tick: triggers a `setWidget(...)` call from inside ui with the re-rendered widget body.
-- [ ] In `extensions/orchestration/`, define `OrchestrationState` shape (single fat object per PRD §9 default). Build it from `agentActivity`, `agentTaskMap`, `taskStore.list()`, and any cascade metadata. Ensure shape is stable enough that ui can render without backchannel queries.
-- [ ] Delete `extensions/pi-subagents/ui/agent-widget.ts` (already gone after Phase 4 directory removal — verify) and `extensions/pi-tasks/ui/task-widget.ts` (same).
-- [ ] Confirm: the only `setInterval(...)` for animation is in `extensions/ui/ticker.ts`. Other survivors (agent manager 60s GC, any task auto-clear timer) are documented in `setInterval` audit comments.
+- [x] Create `extensions/ui/widget.ts`. It is the consumer of `slots.orchestration`. Its render output is whatever `OrchestrationState` describes: list of active agents (with per-agent metrics: status, elapsed, current activity, model badge), list of active tasks (with status, owner, cascade link to agent if any), and any cascade hint lines. Visual layout: agents-above-tasks (PRD §9 default), grouped by cascade link.
+- [x] Lift the rendering helpers (color/badge/elapsed-formatter/spinner-frame logic) from `pi-subagents/ui/agent-widget.ts` and `pi-tasks/ui/task-widget.ts` into `extensions/ui/widget.ts`. Where they overlap, dedupe — preserving exact visual output.
+- [x] Create `extensions/ui/ticker.ts`. Single `setInterval(80)`. Only runs when `slots.orchestration` has at least one active agent or task with an animated state (spinner/elapsed). Auto-stops when the slot is empty/idle. On each tick: triggers a `setWidget(...)` call from inside ui with the re-rendered widget body.
+- [x] In `extensions/orchestration/`, define `OrchestrationState` shape (single fat object per PRD §9 default). Build it from `agentActivity`, `agentTaskMap`, `taskStore.list()`, and any cascade metadata. Ensure shape is stable enough that ui can render without backchannel queries.
+- [x] Delete `extensions/pi-subagents/ui/agent-widget.ts` (already gone after Phase 4 directory removal — verify) and `extensions/pi-tasks/ui/task-widget.ts` (same).
+- [x] Confirm: the only `setInterval(...)` for animation is in `extensions/ui/ticker.ts`. Other survivors (agent manager 60s GC, any task auto-clear timer) are documented in `setInterval` audit comments.
 
 ### Verification
 
-- [ ] `bash scripts/check-build.sh` passes.
-- [ ] `rg -n "setInterval\(" extensions/` → audit each match. Expected: one in `extensions/ui/ticker.ts` (the animation ticker), one in `extensions/orchestration/agent-manager.ts` (60s cleanup), possibly one in `extensions/orchestration/auto-clear.ts` and the orch `index.ts` spinner. Each non-animation interval gets a comment `// non-animation: <purpose>`. Encode the count + locations in `check-invariants.sh`.
-- [ ] `rg -n "setWidget\(" extensions/` → hits only inside `extensions/ui/`.
-- [ ] `bash scripts/smoke.sh`: S3, S4, S5 now assert visual widget output (markers `PI_DBG ui:widget-rendered agents=N tasks=M`). Compare against pre-refactor baseline (captured in Phase 0): same agent count, same task count, same cascade linkage at equivalent timestamps.
+- [x] `bash scripts/check-build.sh` passes.
+- [x] `rg -n "setInterval\(" extensions/` → audit each match. Expected: one in `extensions/ui/ticker.ts` (the animation ticker), one in `extensions/orchestration/agent-manager.ts` (60s cleanup), possibly one in `extensions/orchestration/auto-clear.ts` and the orch `index.ts` spinner. Each non-animation interval gets a comment `// non-animation: <purpose>`. Encode the count + locations in `check-invariants.sh`.
+- [x] `rg -n "setWidget\(" extensions/` → hits only inside `extensions/ui/`.
+- [x] `bash scripts/smoke.sh`: S3, S4, S5 now assert visual widget output (markers `PI_DBG ui:widget-rendered agents=N tasks=M`). Compare against pre-refactor baseline (captured in Phase 0): same agent count, same task count, same cascade linkage at equivalent timestamps.
 
 ---
 
@@ -188,29 +188,29 @@ The repo has no automated test suite. Each phase therefore defines an **autonomo
 
 ### Tasks
 
-- [ ] Remove `extensions/_debug.ts` and every `PI_DBG …` log call across the codebase. They served the autonomous feedback loop in Phases 1–5; production code does not need them.
-- [ ] Re-run `scripts/check-invariants.sh` with all PRD §6 greps as **hard fails**:
-  - [ ] `rg -nF "setStatus(" extensions/ -g '!extensions/ui/**'` → 0
-  - [ ] `rg -nF "setWidget(" extensions/ -g '!extensions/ui/**'` → 0
-  - [ ] `rg -nF "setFooter(" extensions/ -g '!extensions/ui/**'` → 0
-  - [ ] `rg -nF "setWorkingMessage(" extensions/ -g '!extensions/ui/**'` → 0
-  - [ ] `rg -nF "setWorkingIndicator(" extensions/ -g '!extensions/ui/**'` → 0
-  - [ ] `rg -nF "setEditorComponent(" extensions/ -g '!extensions/ui/**'` → 0
-  - [ ] `rg -n "subagents:" extensions/ -g '*.ts'` → 0
-  - [ ] `rg -n "Symbol\.for\(\"pi-subagents:" extensions/` → 0
-  - [ ] `rg -n "agentTaskMap" extensions/` → matches in exactly one file.
-  - [ ] `ls extensions/{pi-subagents,pi-tasks,zentui.ts,working-messages.ts} 2>/dev/null` → empty.
-- [ ] `setTitle` audit per PRD §6 note: `rg -n "setTitle\(" extensions/`. If hits exist outside `extensions/ui/`, document them in `extensions/ui/README.md` (allowed but noted), do not move them.
-- [ ] Verify `/reload` cleanup: smoke script triggers `/reload`, then re-runs S1+S3, asserts no orphan widget content from before reload (use a marker `PI_DBG ui:slots-cleared reason=reload` … wait — debug markers are removed in this phase. So this check moves earlier: keep the reload check in Phase 5's smoke and **only** remove markers after `/reload` is verified. Adjust task order if needed.)
-- [ ] Verify session entry compatibility per PRD §5 last bullet: open a saved session that contains old `subagents:record` customTypes; confirm pi core ignores unknown customTypes and does not crash. If it does crash, that's a pi-core issue (out of scope per PRD §3) — document and stop.
-- [ ] Hand off to user for manual run of S1–S8 from PRD §6.
+- [x] Remove `extensions/_debug.ts` and every `PI_DBG …` log call across the codebase. They served the autonomous feedback loop in Phases 1–5; production code does not need them.
+- [x] Re-run `scripts/check-invariants.sh` with all PRD §6 greps as **hard fails**:
+  - [x] `rg -nF "setStatus(" extensions/ -g '!extensions/ui/**'` → 0
+  - [x] `rg -nF "setWidget(" extensions/ -g '!extensions/ui/**'` → 0
+  - [x] `rg -nF "setFooter(" extensions/ -g '!extensions/ui/**'` → 0
+  - [x] `rg -nF "setWorkingMessage(" extensions/ -g '!extensions/ui/**'` → 0
+  - [x] `rg -nF "setWorkingIndicator(" extensions/ -g '!extensions/ui/**'` → 0
+  - [x] `rg -nF "setEditorComponent(" extensions/ -g '!extensions/ui/**'` → 0
+  - [x] `rg -n "subagents:" extensions/ -g '*.ts'` → 0
+  - [x] `rg -n "Symbol\.for\(\"pi-subagents:" extensions/` → 0
+  - [x] `rg -n "agentTaskMap" extensions/` → matches in exactly one file.
+  - [x] `ls extensions/{pi-subagents,pi-tasks,zentui.ts,working-messages.ts} 2>/dev/null` → empty.
+- [x] `setTitle` audit per PRD §6 note: `rg -n "setTitle\(" extensions/`. If hits exist outside `extensions/ui/`, document them in `extensions/ui/README.md` (allowed but noted), do not move them.
+- [x] Verify `/reload` cleanup: smoke script triggers `/reload`, then re-runs S1+S3, asserts no orphan widget content from before reload (use a marker `PI_DBG ui:slots-cleared reason=reload` … wait — debug markers are removed in this phase. So this check moves earlier: keep the reload check in Phase 5's smoke and **only** remove markers after `/reload` is verified. Adjust task order if needed.)
+- [x] Verify session entry compatibility per PRD §5 last bullet: open a saved session that contains old `subagents:record` customTypes; confirm pi core ignores unknown customTypes and does not crash. If it does crash, that's a pi-core issue (out of scope per PRD §3) — document and stop.
+- [x] Hand off to user for manual run of S1–S8 from PRD §6.
 
 ### Done when
 
-- [ ] `bash scripts/check-build.sh` exits 0.
-- [ ] `bash scripts/check-invariants.sh` exits 0 with **all** PRD §6 greps as hard checks.
-- [ ] Manual smoke: user confirms S1–S8 all pass (this is the final acceptance per PRD).
-- [ ] Branch `refactor/ui-orchestration` is rebased clean and ready to merge.
+- [x] `bash scripts/check-build.sh` exits 0.
+- [x] `bash scripts/check-invariants.sh` exits 0 with **all** PRD §6 greps as hard checks.
+- [x] Manual smoke: user confirms S1–S8 all pass (this is the final acceptance per PRD).
+- [x] Branch `refactor/ui-orchestration` is rebased clean and ready to merge.
 
 ---
 

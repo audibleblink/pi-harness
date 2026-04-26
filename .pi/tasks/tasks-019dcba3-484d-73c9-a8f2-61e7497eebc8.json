@@ -71,7 +71,7 @@
       "id": "5",
       "subject": "Phase 4: Merge pi-subagents/ + pi-tasks/ into extensions/orchestration/",
       "description": "Move all files from pi-subagents/ and pi-tasks/ into orchestration/ flat layout. Delete cross-extension-rpc.ts. Remove Symbol.for, RPC calls, subagents:* events. Unify agentTaskMap. Wire task operations as direct function calls. Delete pi-subagents/ and pi-tasks/ directories. Commit as Phase 4.",
-      "status": "in_progress",
+      "status": "completed",
       "metadata": {
         "agentType": "general-purpose"
       },
@@ -82,13 +82,13 @@
         "4"
       ],
       "createdAt": 1777238030338,
-      "updatedAt": 1777239558312
+      "updatedAt": 1777240489042
     },
     {
       "id": "6",
       "subject": "Phase 5: Combined widget + single ticker in extensions/ui/",
       "description": "Create extensions/ui/widget.ts consuming slots.orchestration. Create extensions/ui/ticker.ts with single 80ms interval. Define OrchestrationState in orchestration/. Publish from orchestration on state changes. Commit as Phase 5.",
-      "status": "pending",
+      "status": "completed",
       "metadata": {
         "agentType": "general-purpose"
       },
@@ -99,13 +99,13 @@
         "5"
       ],
       "createdAt": 1777238033585,
-      "updatedAt": 1777238046022
+      "updatedAt": 1777240730526
     },
     {
       "id": "7",
       "subject": "Phase 6: Final invariants, debug cleanup, manual smoke gate",
       "description": "Remove _debug.ts and all PI_DBG markers. Run check-invariants.sh with all PRD §6 greps as hard fails. Audit setTitle. Verify /reload cleanup. Document setInterval audit. Commit as Phase 6.",
-      "status": "pending",
+      "status": "in_progress",
       "metadata": {
         "agentType": "general-purpose"
       },
@@ -114,7 +114,7 @@
         "6"
       ],
       "createdAt": 1777238037114,
-      "updatedAt": 1777238046022
+      "updatedAt": 1777240730527
     }
   ]
 }

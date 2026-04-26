@@ -8,7 +8,6 @@
  */
 
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { debugLog } from "../_debug.js";
 import { UI_BUS_TOPIC, SLOT_ORCHESTRATION, type UiBusEnvelope, type OrchestrationState } from "./bus.js";
 import { setupFooter, type FooterHandle } from "./footer.js";
 import { registerEditor } from "./editor.js";
@@ -40,7 +39,6 @@ export default function uiExtension(pi: ExtensionAPI) {
 	}
 
 	function onSlotChanged(slot: string): void {
-		debugLog("ui", "slot-changed", { slot });
 		if (slot === SLOT_ORCHESTRATION) {
 			const state = slots.get(SLOT_ORCHESTRATION) as OrchestrationState | null | undefined;
 			if (!state || !hasAnimatedState(state)) {
@@ -75,7 +73,6 @@ export default function uiExtension(pi: ExtensionAPI) {
 			ticker.stop();
 			frame = 0;
 			slots.clear();
-			debugLog("ui", "slots-cleared", { reason: "reload" });
 		}
 		currentCtx = ctx;
 		handle = setupFooter(ctx, slots);

@@ -14,7 +14,6 @@ import { readdir } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { promisify } from "node:util";
 import type { AssistantMessage } from "@mariozechner/pi-ai";
-import { debugLog } from "../_debug.js";
 import { type ExtensionContext, getAgentDir } from "@mariozechner/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
 import type { UndoState } from "./bus.js";
@@ -702,7 +701,6 @@ export function setupFooter(ctx: ExtensionContext, slots: Map<string, unknown>):
 			},
 			invalidate() {},
 			render(width: number): string[] {
-				debugLog("ui", "footer-render");
 				const innerWidth = Math.max(1, width - 2);
 
 				// Undo state comes from the UIBus slot (not extStatuses)
