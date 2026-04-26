@@ -323,7 +323,7 @@ export default function undoRedoExtension(pi: ExtensionAPI) {
 		},
 	});
 
-	pi.registerShortcut(Key.f8, {
+	pi.registerShortcut("ctrl+shift+u", {
 		description: "Show files in the current undo/redo step",
 		handler: async (ctx) => {
 			await showCurrentStepModal(ctx);
@@ -955,7 +955,7 @@ async function updateStatusWidget(ctx: ExtensionContext): Promise<void> {
 	lastStatusCounts = counts;
 	const t = ctx.ui.theme;
 	const label = t.fg("muted", `↶${counts.undo} ↷${counts.redo}`);
-	const hint = t.fg("borderMuted", " f8");
+	const hint = t.fg("borderMuted", " ctrl+shift+u");
 	ctx.ui.setStatus(STATUS_WIDGET_ID, label + hint);
 }
 
