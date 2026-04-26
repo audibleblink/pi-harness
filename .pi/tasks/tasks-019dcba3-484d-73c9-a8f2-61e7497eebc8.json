@@ -1,0 +1,120 @@
+{
+  "nextId": 8,
+  "tasks": [
+    {
+      "id": "1",
+      "subject": "Phase 0: Scaffolding & verification harness",
+      "description": "Add tsconfig.json at repo root, scripts/check-build.sh, scripts/check-invariants.sh, scripts/smoke.sh, extensions/_debug.ts, and wire debug markers into existing extensions. Commit as Phase 0 on branch refactor/ui-orchestration.",
+      "status": "in_progress",
+      "metadata": {
+        "agentType": "general-purpose"
+      },
+      "blocks": [
+        "2"
+      ],
+      "blockedBy": [],
+      "createdAt": 1777238016888,
+      "updatedAt": 1777238064958
+    },
+    {
+      "id": "2",
+      "subject": "Phase 1: Introduce UIBus + extensions/ui/ shell",
+      "description": "Create extensions/ui/bus.ts with publishMode/publishUndo/publishOrchestration/publishWorking helpers. Create extensions/ui/index.ts that subscribes to harness.ui:publish, maintains slots Map, clears on reload. Register in harness manifest. Commit as Phase 1.",
+      "status": "pending",
+      "metadata": {
+        "agentType": "general-purpose"
+      },
+      "blocks": [
+        "3"
+      ],
+      "blockedBy": [
+        "1"
+      ],
+      "createdAt": 1777238020588,
+      "updatedAt": 1777238046017
+    },
+    {
+      "id": "3",
+      "subject": "Phase 2: Migrate modes.ts and pi-undo-redo.ts to UIBus",
+      "description": "Add publishMode/publishUndo calls alongside existing setStatus calls in modes.ts and pi-undo-redo.ts (dual-publish). Import from ./ui/bus.ts. Do not remove setStatus yet. Commit as Phase 2.",
+      "status": "pending",
+      "metadata": {
+        "agentType": "general-purpose"
+      },
+      "blocks": [
+        "4"
+      ],
+      "blockedBy": [
+        "2"
+      ],
+      "createdAt": 1777238024105,
+      "updatedAt": 1777238046018
+    },
+    {
+      "id": "4",
+      "subject": "Phase 3: Lift footer/editor/working into extensions/ui/",
+      "description": "Create extensions/ui/footer.ts, editor.ts, working.ts by lifting from zentui.ts and working-messages.ts. Delete zentui.ts and working-messages.ts. Remove dual-publish - only publishMode/publishUndo remain. Commit as Phase 3.",
+      "status": "pending",
+      "metadata": {
+        "agentType": "general-purpose"
+      },
+      "blocks": [
+        "5"
+      ],
+      "blockedBy": [
+        "3"
+      ],
+      "createdAt": 1777238026717,
+      "updatedAt": 1777238046019
+    },
+    {
+      "id": "5",
+      "subject": "Phase 4: Merge pi-subagents/ + pi-tasks/ into extensions/orchestration/",
+      "description": "Move all files from pi-subagents/ and pi-tasks/ into orchestration/ flat layout. Delete cross-extension-rpc.ts. Remove Symbol.for, RPC calls, subagents:* events. Unify agentTaskMap. Wire task operations as direct function calls. Delete pi-subagents/ and pi-tasks/ directories. Commit as Phase 4.",
+      "status": "pending",
+      "metadata": {
+        "agentType": "general-purpose"
+      },
+      "blocks": [
+        "6"
+      ],
+      "blockedBy": [
+        "4"
+      ],
+      "createdAt": 1777238030338,
+      "updatedAt": 1777238046021
+    },
+    {
+      "id": "6",
+      "subject": "Phase 5: Combined widget + single ticker in extensions/ui/",
+      "description": "Create extensions/ui/widget.ts consuming slots.orchestration. Create extensions/ui/ticker.ts with single 80ms interval. Define OrchestrationState in orchestration/. Publish from orchestration on state changes. Commit as Phase 5.",
+      "status": "pending",
+      "metadata": {
+        "agentType": "general-purpose"
+      },
+      "blocks": [
+        "7"
+      ],
+      "blockedBy": [
+        "5"
+      ],
+      "createdAt": 1777238033585,
+      "updatedAt": 1777238046022
+    },
+    {
+      "id": "7",
+      "subject": "Phase 6: Final invariants, debug cleanup, manual smoke gate",
+      "description": "Remove _debug.ts and all PI_DBG markers. Run check-invariants.sh with all PRD §6 greps as hard fails. Audit setTitle. Verify /reload cleanup. Document setInterval audit. Commit as Phase 6.",
+      "status": "pending",
+      "metadata": {
+        "agentType": "general-purpose"
+      },
+      "blocks": [],
+      "blockedBy": [
+        "6"
+      ],
+      "createdAt": 1777238037114,
+      "updatedAt": 1777238046022
+    }
+  ]
+}

@@ -26,6 +26,7 @@ import {
 	withFileMutationQueue,
 } from "@mariozechner/pi-coding-agent";
 import { Key, matchesKey, Text, truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
+import { debugLog } from "./_debug.js";
 
 // ────────────────────────── blob store ──────────────────────────
 
@@ -942,6 +943,7 @@ function collectBlobIdsFromEntries(
 let lastStatusCounts: { undo: number; redo: number } | undefined;
 
 async function updateStatusWidget(ctx: ExtensionContext): Promise<void> {
+	debugLog("undo", "status-update");
 	if (!ctx.hasUI) return;
 	const state = deriveUndoRedoState(ctx.sessionManager.getBranch());
 	const counts = { undo: state.applied.length, redo: state.redo.length };

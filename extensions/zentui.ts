@@ -4,6 +4,7 @@ import { readdir } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { promisify } from "node:util";
 import type { AssistantMessage } from "@mariozechner/pi-ai";
+import { debugLog } from "./_debug.js";
 import {
 	CustomEditor,
 	type ExtensionAPI,
@@ -836,6 +837,7 @@ export default function (pi: ExtensionAPI) {
 				},
 				invalidate() {},
 				render(width: number): string[] {
+					debugLog("zentui", "render");
 					const innerWidth = Math.max(1, width - 2);
 					const contextColor =
 						state.contextPercent !== null && state.contextPercent !== undefined

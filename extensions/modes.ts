@@ -41,6 +41,7 @@ import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Api, Model } from "@mariozechner/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import { debugLog } from "./_debug.js";
 import { DynamicBorder, getAgentDir, parseFrontmatter } from "@mariozechner/pi-coding-agent";
 import { Container, Key, type SelectItem, SelectList, Text } from "@mariozechner/pi-tui";
 
@@ -342,6 +343,7 @@ export default function agentModeExtension(pi: ExtensionAPI) {
 	}
 
 	function updateStatus(ctx: ExtensionContext) {
+		debugLog("modes", "status-update");
 		const t = ctx.ui.theme;
 		if (activeAgent) {
 			const label = t.fg("syntaxKeyword", `▸ ${activeAgent.name}`);

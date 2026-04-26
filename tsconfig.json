@@ -1,0 +1,42 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@mariozechner/pi-coding-agent": [
+        "../../.local/share/mise/installs/node/24.7.0/lib/node_modules/@mariozechner/pi-coding-agent"
+      ],
+      "@mariozechner/pi-agent-core": [
+        "../../.local/share/mise/installs/node/24.7.0/lib/node_modules/@mariozechner/pi-coding-agent/node_modules/@mariozechner/pi-agent-core"
+      ],
+      "@mariozechner/pi-ai": [
+        "../../.local/share/mise/installs/node/24.7.0/lib/node_modules/@mariozechner/pi-coding-agent/node_modules/@mariozechner/pi-ai"
+      ],
+      "@mariozechner/pi-tui": [
+        "../../.local/share/mise/installs/node/24.7.0/lib/node_modules/@mariozechner/pi-coding-agent/node_modules/@mariozechner/pi-tui"
+      ],
+      "@sinclair/typebox": [
+        "../../.local/share/mise/installs/node/24.7.0/lib/node_modules/@mariozechner/pi-coding-agent/node_modules/typebox"
+      ]
+    }
+  },
+  "include": ["extensions/**/*.ts"],
+  "exclude": [
+    // pi-subagents and pi-tasks are not registered in settings.json and have
+    // pre-existing type errors (unknown event names, params typed as unknown
+    // due to 'as any' schema casts) that require code changes to fix.
+    "extensions/pi-subagents",
+    "extensions/pi-tasks",
+    // ask-user-question.ts: 'parameters: AskUserQuestionParams as any' causes
+    // TParams to fall back to TSchema, making params unknown under strict mode.
+    "extensions/ask-user-question.ts",
+    // working-messages.ts: uses non-existent 'request_start' event and a
+    // local function type signature incompatible with strict ThemeColor types.
+    "extensions/working-messages.ts"
+  ]
+}
