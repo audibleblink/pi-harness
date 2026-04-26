@@ -955,8 +955,7 @@ async function updateStatusWidget(ctx: ExtensionContext): Promise<void> {
 	lastStatusCounts = counts;
 	const t = ctx.ui.theme;
 	const label = t.fg("muted", `↶${counts.undo} ↷${counts.redo}`);
-	const hint = t.fg("borderMuted", " ctrl+shift+u");
-	ctx.ui.setStatus(STATUS_WIDGET_ID, label + hint);
+	ctx.ui.setStatus(STATUS_WIDGET_ID, label);
 }
 
 async function validateTargets(targets: Map<string, BlobRef | undefined>): Promise<ValidationIssue[]> {

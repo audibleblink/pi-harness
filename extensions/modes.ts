@@ -350,7 +350,7 @@ export default function agentModeExtension(pi: ExtensionAPI) {
 		} else if (agents.size > 0) {
 			ctx.ui.setStatus(
 				AGENT_BANNER_WIDGET,
-				t.fg("syntaxKeyword", "▸ ") + t.fg("muted", "pi /⌃⇧M"),
+				t.fg("syntaxKeyword", "▸ ") + t.fg("muted", "pi"),
 			);
 		} else {
 			ctx.ui.setStatus(AGENT_BANNER_WIDGET, undefined);
