@@ -27,6 +27,7 @@ import {
 } from "@mariozechner/pi-coding-agent";
 import { Key, matchesKey, Text, truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
 import { debugLog } from "./_debug.js";
+import { publishUndo } from "./ui/bus.js";
 
 // ────────────────────────── blob store ──────────────────────────
 
@@ -335,12 +336,13 @@ export default function undoRedoExtension(pi: ExtensionAPI) {
 		currentCwd = ctx.cwd;
 		currentRun = undefined;
 		await maybeRunAutomaticGc(ctx, "startup");
-		await updateStatusWidget(ctx);
+		await updateStatusWidget(pi, ctx);
 	});
 
 	pi.on("session_shutdown", async (_event, ctx) => {
 		if (ctx.hasUI) {
 			ctx.ui.setStatus(STATUS_WIDGET_ID, undefined);
+			publishUndo(pi, null);
 			lastStatusCounts = undefined;
 		}
 	});
@@ -352,7 +354,7 @@ export default function undoRedoExtension(pi: ExtensionAPI) {
 	pi.on("agent_end", async (_event, ctx) => {
 		const didRecordStep = await finalizeCurrentRunIfNeeded();
 		if (didRecordStep) await maybeRunAutomaticGc(ctx, "threshold");
-		await updateStatusWidget(ctx);
+		await updateStatusWidget(pi, ctx);
 	});
 
 	async function handleHistoryCommand(
@@ -365,14 +367,14 @@ export default function undoRedoExtension(pi: ExtensionAPI) {
 		const stepId = kind === "undo" ? state.applied.at(-1) : state.redo.at(-1);
 		if (!stepId) {
 			ctx.ui.notify(kind === "undo" ? "Nothing to undo" : "Nothing to redo", "info");
-			await updateStatusWidget(ctx);
+			await updateStatusWidget(pi, ctx);
 			return;
 		}
 
 		const step = state.stepsById.get(stepId);
 		if (!step) {
 			ctx.ui.notify(`Could not find ${kind} step ${stepId}`, "error");
-			await updateStatusWidget(ctx);
+			await updateStatusWidget(pi, ctx);
 			return;
 		}
 
@@ -384,7 +386,7 @@ export default function undoRedoExtension(pi: ExtensionAPI) {
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			ctx.ui.notify(`${kind} failed: ${message}`, "error");
-			await updateStatusWidget(ctx);
+			await updateStatusWidget(pi, ctx);
 			return;
 		}
 
@@ -407,7 +409,7 @@ export default function undoRedoExtension(pi: ExtensionAPI) {
 			},
 			{ deliverAs: "nextTurn" },
 		);
-		await updateStatusWidget(ctx);
+		await updateStatusWidget(pi, ctx);
 	}
 
 	async function maybeRunAutomaticGc(
@@ -942,7 +944,7 @@ function collectBlobIdsFromEntries(
 
 let lastStatusCounts: { undo: number; redo: number } | undefined;
 
-async function updateStatusWidget(ctx: ExtensionContext): Promise<void> {
+async function updateStatusWidget(pi: ExtensionAPI, ctx: ExtensionContext): Promise<void> {
 	debugLog("undo", "status-update");
 	if (!ctx.hasUI) return;
 	const state = deriveUndoRedoState(ctx.sessionManager.getBranch());
@@ -958,6 +960,7 @@ async function updateStatusWidget(ctx: ExtensionContext): Promise<void> {
 	const t = ctx.ui.theme;
 	const label = t.fg("muted", `↶${counts.undo} ↷${counts.redo}`);
 	ctx.ui.setStatus(STATUS_WIDGET_ID, label);
+	publishUndo(pi, { undos: counts.undo, redos: counts.redo });
 }
 
 async function validateTargets(targets: Map<string, BlobRef | undefined>): Promise<ValidationIssue[]> {

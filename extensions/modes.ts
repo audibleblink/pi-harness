@@ -42,6 +42,7 @@ import { fileURLToPath } from "node:url";
 import type { Api, Model } from "@mariozechner/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { debugLog } from "./_debug.js";
+import { publishMode } from "./ui/bus.js";
 import { DynamicBorder, getAgentDir, parseFrontmatter } from "@mariozechner/pi-coding-agent";
 import { Container, Key, type SelectItem, SelectList, Text } from "@mariozechner/pi-tui";
 
@@ -349,13 +350,16 @@ export default function agentModeExtension(pi: ExtensionAPI) {
 			const label = t.fg("syntaxKeyword", `▸ ${activeAgent.name}`);
 			const model = activeAgent.model ? t.fg("muted", ` ${activeAgent.model}`) : "";
 			ctx.ui.setStatus(AGENT_BANNER_WIDGET, label + model);
+			publishMode(pi, { label: activeAgent.name, model: activeAgent.model });
 		} else if (agents.size > 0) {
 			ctx.ui.setStatus(
 				AGENT_BANNER_WIDGET,
 				t.fg("syntaxKeyword", "▸ ") + t.fg("muted", "pi"),
 			);
+			publishMode(pi, { label: "pi" });
 		} else {
 			ctx.ui.setStatus(AGENT_BANNER_WIDGET, undefined);
+			publishMode(pi, null);
 		}
 	}
 
