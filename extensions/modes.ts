@@ -436,26 +436,6 @@ export default function agentModeExtension(pi: ExtensionAPI) {
 		},
 	});
 
-	pi.registerCommand("agents", {
-		description: "List available agents",
-		handler: async (_args, ctx) => {
-			if (agents.size === 0) {
-				ctx.ui.notify(NO_AGENTS_MSG, "warning");
-				return;
-			}
-
-			const lines = Array.from(agents.entries())
-				.sort(([a], [b]) => a.localeCompare(b))
-				.map(([name, agent]) => {
-					const marker = name === activeAgent?.name ? "● " : "○ ";
-					const desc = agent.description ? ` - ${agent.description}` : "";
-					return `${marker}${name}${desc}`;
-				});
-
-			ctx.ui.notify(`Available agents:\n${lines.join("\n")}`, "info");
-		},
-	});
-
 	// ─── Event Handlers ─────────────────────────────────────────────────────────
 
 	pi.on("before_agent_start", async (event) => {
