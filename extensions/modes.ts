@@ -228,16 +228,13 @@ export default function agentModeExtension(pi: ExtensionAPI) {
 			}
 		}
 
-		// Merge with original tools (not replace) to preserve tools from other extensions
-		// like pi-mcp-adapter. Base off originalState to prevent accumulation across switches.
+		// Replace the tool set with the agent's whitelist. Agent frontmatter `tools:`
+		// is authoritative — listed tools only, nothing more. Tools not listed (e.g.
+		// write/edit for a read-only agent) become unavailable to the LLM.
 		if (agent.tools && agent.tools.length > 0) {
 			const allToolNames = new Set(pi.getAllTools().map((t) => t.name));
 			const validTools = agent.tools.filter((t) => allToolNames.has(t));
-			if (validTools.length > 0) {
-				const baseTools = originalState?.tools ?? pi.getActiveTools();
-				const merged = Array.from(new Set([...baseTools, ...validTools]));
-				pi.setActiveTools(merged);
-			}
+			pi.setActiveTools(validTools);
 		}
 
 		activeAgent = agent;
@@ -345,28 +342,16 @@ export default function agentModeExtension(pi: ExtensionAPI) {
 	}
 
 	function updateStatus(ctx: ExtensionContext) {
+		const t = ctx.ui.theme;
 		if (activeAgent) {
-			const description = activeAgent.description
-				? ctx.ui.theme.fg("muted", ` — ${activeAgent.description}`)
-				: "";
-			const modelInfo = activeAgent.model
-				? ctx.ui.theme.fg("dim", ` [${activeAgent.model}]`)
-				: "";
-			const toolsInfo = activeAgent.tools
-				? ctx.ui.theme.fg("dim", ` {${activeAgent.tools.join(", ")}}`)
-				: "";
-
-			const banner =
-				ctx.ui.theme.fg("accent", "▸ ") +
-				ctx.ui.theme.bold(ctx.ui.theme.fg("accent", activeAgent.name)) +
-				description +
-				modelInfo +
-				toolsInfo;
-
-			ctx.ui.setStatus(AGENT_BANNER_WIDGET, banner);
+			const label = t.fg("syntaxKeyword", `▸ ${activeAgent.name}`);
+			const model = activeAgent.model ? t.fg("muted", ` ${activeAgent.model}`) : "";
+			ctx.ui.setStatus(AGENT_BANNER_WIDGET, label + model);
 		} else if (agents.size > 0) {
-			const hint = ctx.ui.theme.fg("dim", "[No agent selected — /agent, Ctrl+Shift+M (cycle)]");
-			ctx.ui.setStatus(AGENT_BANNER_WIDGET, hint);
+			ctx.ui.setStatus(
+				AGENT_BANNER_WIDGET,
+				t.fg("syntaxKeyword", "▸ ") + t.fg("muted", "pi /⌃⇧M"),
+			);
 		} else {
 			ctx.ui.setStatus(AGENT_BANNER_WIDGET, undefined);
 		}

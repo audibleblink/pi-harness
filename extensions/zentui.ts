@@ -496,6 +496,8 @@ function patchUserMessageComponent(): void {
 class PolishedEditor extends CustomEditor {
 	private readonly getModelMeta: () => string;
 	private readonly getThinkingLevel: () => string | undefined;
+	private readonly getAgentMeta: () => string | undefined;
+	private readonly getTopRightLabel: () => string | undefined;
 	private readonly uiTheme: Theme;
 	private readonly reset = "\x1b[0m";
 
@@ -506,12 +508,16 @@ class PolishedEditor extends CustomEditor {
 		uiTheme: Theme,
 		getModelMeta: () => string,
 		getThinkingLevel: () => string | undefined,
+		getAgentMeta: () => string | undefined,
+		getTopRightLabel: () => string | undefined,
 	) {
 		super(tui, theme, keybindings, { paddingX: 0 });
 		this.borderColor = (text: string) => uiTheme.fg("border", text);
 		this.uiTheme = uiTheme;
 		this.getModelMeta = getModelMeta;
 		this.getThinkingLevel = getThinkingLevel;
+		this.getAgentMeta = getAgentMeta;
+		this.getTopRightLabel = getTopRightLabel;
 	}
 
 	private fillLine(content: string, width: number): string {
@@ -552,6 +558,15 @@ class PolishedEditor extends CustomEditor {
 			metaParts.push(this.uiTheme.fg("muted", thinkingLevel));
 		}
 		const meta = metaParts.filter(Boolean).join(this.uiTheme.fg("border", "  "));
+		const agentMeta = this.getAgentMeta();
+		const metaLine = agentMeta
+			? (() => {
+					const leftW = visibleWidth(meta);
+					const rightW = visibleWidth(agentMeta);
+					const gap = innerWidth - leftW - rightW;
+					return gap >= 1 ? `${meta}${" ".repeat(gap)}${agentMeta}` : meta;
+				})()
+			: meta;
 
 		const isBashMode = this.getText().startsWith("!");
 		const railColor = isBashMode ? "mdCode" : "accent";
@@ -560,9 +575,25 @@ class PolishedEditor extends CustomEditor {
 		const coloredEditorLines = editorLines.map((l) => (textPrefix ? `${textPrefix}${l}` : l));
 		const leftRail = `${this.uiTheme.fg(railColor, "│")}${this.reset} `;
 		const rightRail = ` ${this.uiTheme.fg(railColor, "│")}${this.reset}`;
-		const top = this.uiTheme.fg(railColor, "╭") + this.uiTheme.fg(borderColor, "─".repeat(Math.max(0, width - 2))) + this.uiTheme.fg(railColor, "╮");
-		const bottom = this.uiTheme.fg(railColor, "╰") + this.uiTheme.fg(borderColor, "─".repeat(Math.max(0, width - 2))) + this.uiTheme.fg(railColor, "╯");
-		const lines = ["", ...coloredEditorLines, "", meta];
+		const innerDashes = Math.max(0, width - 2);
+		const topRight = this.getTopRightLabel();
+		const topRightW = topRight ? visibleWidth(topRight) : 0;
+		let topMid: string;
+		if (topRight && innerDashes >= topRightW + 8) {
+			const rightPad = 2;
+			const leftDashes = innerDashes - topRightW - rightPad - 4;
+			topMid =
+				this.uiTheme.fg(borderColor, "─".repeat(leftDashes)) +
+				this.uiTheme.fg(borderColor, "┤") +
+				" " + topRight + " " +
+				this.uiTheme.fg(borderColor, "├") +
+				this.uiTheme.fg(borderColor, "─".repeat(rightPad));
+		} else {
+			topMid = this.uiTheme.fg(borderColor, "─".repeat(innerDashes));
+		}
+		const top = this.uiTheme.fg(railColor, "╭") + topMid + this.uiTheme.fg(railColor, "╮");
+		const bottom = this.uiTheme.fg(railColor, "╰") + this.uiTheme.fg(borderColor, "─".repeat(innerDashes)) + this.uiTheme.fg(railColor, "╯");
+		const lines = ["", ...coloredEditorLines, "", metaLine];
 
 		return [
 			top,
@@ -691,6 +722,44 @@ export default function (pi: ExtensionAPI) {
 
 	let currentConfig: PolishedTuiConfig = loadConfig();
 	let requestFooterRender: (() => void) | undefined;
+	let agentStatusText: string | undefined;
+	let undoStatusText: string | undefined;
+	const AGENT_STATUS_KEY = "agent-mode-banner";
+	const UNDO_STATUS_KEY = "@kmiyh/pi-undo-redo/status";
+
+	const buildCwdGitSegment = (theme: ThemeLike): string => {
+		const cwdLabel = colorize(
+			theme,
+			currentConfig.colors.cwdText,
+			formatCwdLabel(state.cwd, currentConfig.icons.cwd),
+		);
+		const branch = state.branch;
+		if (!branch) return cwdLabel;
+		const gitColor = (text: string) => colorize(theme, currentConfig.colors.git, text);
+		const gitStatusColor = (text: string) => colorize(theme, currentConfig.colors.gitStatus, text);
+		const gitIcon = gitColor(currentConfig.icons.git);
+		const allStatus = [
+			state.conflicted > 0 ? currentConfig.icons.conflicted : "",
+			state.stashed ? currentConfig.icons.stashed : "",
+			state.deleted > 0 ? currentConfig.icons.deleted : "",
+			state.renamed > 0 ? currentConfig.icons.renamed : "",
+			state.modified > 0 ? currentConfig.icons.modified : "",
+			state.typechanged > 0 ? currentConfig.icons.typechanged : "",
+			state.staged > 0 ? currentConfig.icons.staged : "",
+			state.untracked > 0 ? currentConfig.icons.untracked : "",
+		].join("");
+		const aheadBehind =
+			state.ahead > 0 && state.behind > 0
+				? currentConfig.icons.diverged
+				: state.ahead > 0
+					? currentConfig.icons.ahead
+					: state.behind > 0
+						? currentConfig.icons.behind
+						: "";
+		const statusBlock = allStatus || aheadBehind ? gitStatusColor(`[${allStatus}${aheadBehind}]`) : "";
+		const branchLabel = `${colorize(theme, "text", "on")} ${gitIcon} ${gitColor(branch)}${statusBlock ? ` ${statusBlock}` : ""}`;
+		return `${cwdLabel} ${branchLabel}`;
+	};
 	let projectRefreshInFlight = false;
 	let projectRefreshPending = false;
 	let projectRefreshDebounceTimer: NodeJS.Timeout | undefined;
@@ -768,12 +837,6 @@ export default function (pi: ExtensionAPI) {
 				invalidate() {},
 				render(width: number): string[] {
 					const innerWidth = Math.max(1, width - 2);
-					const cwdLabel = colorize(
-						theme,
-						currentConfig.colors.cwdText,
-						formatCwdLabel(state.cwd, currentConfig.icons.cwd),
-					);
-					const branch = state.branch;
 					const contextColor =
 						state.contextPercent !== null && state.contextPercent !== undefined
 							? state.contextPercent >= 90
@@ -782,51 +845,42 @@ export default function (pi: ExtensionAPI) {
 									? currentConfig.colors.contextWarning
 									: currentConfig.colors.contextNormal
 							: currentConfig.colors.contextNormal;
-					const gitColor = (text: string) => colorize(theme, currentConfig.colors.git, text);
-					const gitStatusColor = (text: string) =>
-						colorize(theme, currentConfig.colors.gitStatus, text);
-					const gitIcon = gitColor(currentConfig.icons.git);
-					const allStatus = [
-						state.conflicted > 0 ? currentConfig.icons.conflicted : "",
-						state.stashed ? currentConfig.icons.stashed : "",
-						state.deleted > 0 ? currentConfig.icons.deleted : "",
-						state.renamed > 0 ? currentConfig.icons.renamed : "",
-						state.modified > 0 ? currentConfig.icons.modified : "",
-						state.typechanged > 0 ? currentConfig.icons.typechanged : "",
-						state.staged > 0 ? currentConfig.icons.staged : "",
-						state.untracked > 0 ? currentConfig.icons.untracked : "",
-					].join("");
-					const aheadBehind =
-						state.ahead > 0 && state.behind > 0
-							? currentConfig.icons.diverged
-							: state.ahead > 0
-								? currentConfig.icons.ahead
-								: state.behind > 0
-									? currentConfig.icons.behind
-									: "";
-					const statusBlock =
-						allStatus || aheadBehind ? gitStatusColor(`[${allStatus}${aheadBehind}]`) : "";
-					const branchLabel = branch
-						? `${colorize(theme, "text", "on")} ${gitIcon} ${gitColor(branch)}${statusBlock ? ` ${statusBlock}` : ""}`
-						: "";
 					const runtimeLabel = formatRuntimeSegment(theme, state.runtime);
 
-					const left = [cwdLabel, branchLabel, runtimeLabel].filter(Boolean).join(" ");
+					const left = runtimeLabel;
 					const right = [
 						colorize(theme, contextColor, state.contextLabel),
 						colorize(theme, currentConfig.colors.tokens, state.tokenLabel),
 						colorize(theme, currentConfig.colors.cost, state.costLabel),
-					].join(separator);
+						undoStatusText,
+					].filter(Boolean).join(separator);
 
 					const leftWidth = visibleWidth(left);
 					const rightWidth = visibleWidth(right);
-					const content =
-						leftWidth >= innerWidth
+					const content = !left
+						? rightWidth >= innerWidth
+							? truncateToWidth(right, innerWidth)
+							: `${" ".repeat(innerWidth - rightWidth)}${right}`
+						: leftWidth >= innerWidth
 							? truncateToWidth(left, innerWidth)
 							: leftWidth + 1 + rightWidth <= innerWidth
 								? `${left}${" ".repeat(innerWidth - leftWidth - rightWidth)}${right}`
 								: left;
-					return [` ${content} `];
+					const lines = [` ${content} `];
+					const extStatuses = footerData.getExtensionStatuses();
+					agentStatusText = extStatuses.get(AGENT_STATUS_KEY);
+					undoStatusText = extStatuses.get(UNDO_STATUS_KEY);
+					const footerEntries = Array.from(extStatuses.entries()).filter(
+						([k]) => k !== AGENT_STATUS_KEY && k !== UNDO_STATUS_KEY,
+					);
+					if (footerEntries.length > 0) {
+						const statusLine = footerEntries
+							.sort(([a], [b]) => a.localeCompare(b))
+							.map(([, t]) => t.replace(/[\r\n\t]/g, " ").replace(/ +/g, " ").trim())
+							.join(separator);
+						lines.push(` ${truncateToWidth(statusLine, innerWidth)} `);
+					}
+					return lines;
 				},
 			};
 		});
@@ -854,6 +908,8 @@ export default function (pi: ExtensionAPI) {
 						return undefined;
 					}
 				},
+				() => agentStatusText,
+				() => buildCwdGitSegment(uiTheme),
 			);
 
 			const originalHandleInput = editor.handleInput.bind(editor);

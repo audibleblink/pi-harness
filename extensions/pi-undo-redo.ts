@@ -953,16 +953,10 @@ async function updateStatusWidget(ctx: ExtensionContext): Promise<void> {
 		return;
 	}
 	lastStatusCounts = counts;
-	const theme = ctx.ui.theme;
-	ctx.ui.setStatus(STATUS_WIDGET_ID, theme.fg("dim", buildStatusLine(state)));
-}
-
-function buildStatusLine(state: DerivedUndoRedoState): string {
-	const undoCount = state.applied.length;
-	const redoCount = state.redo.length;
-	const undoLabel = `undo ${undoCount} step${undoCount === 1 ? "" : "s"} available`;
-	const redoLabel = `redo ${redoCount} step${redoCount === 1 ? "" : "s"} available`;
-	return `${undoLabel} · ${redoLabel} · f8 undo/redo files`;
+	const t = ctx.ui.theme;
+	const label = t.fg("muted", `↶${counts.undo} ↷${counts.redo}`);
+	const hint = t.fg("borderMuted", " f8");
+	ctx.ui.setStatus(STATUS_WIDGET_ID, label + hint);
 }
 
 async function validateTargets(targets: Map<string, BlobRef | undefined>): Promise<ValidationIssue[]> {
