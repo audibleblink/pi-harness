@@ -69,7 +69,6 @@ interface OriginalState {
 
 const CLEAR_AGENT_KEY = "(none)";
 const AGENT_STATE_ENTRY_TYPE = "agent-state";
-const AGENT_BANNER_WIDGET = "agent-mode-banner";
 const NO_AGENTS_MSG = "No agents found. Create agent files in <agentDir>/agents/, this package's agents/, or <cwd>/.pi/agents/";
 
 /**
@@ -343,22 +342,13 @@ export default function agentModeExtension(pi: ExtensionAPI) {
 		await handleAgentSelection(ctx, result);
 	}
 
-	function updateStatus(ctx: ExtensionContext) {
+	function updateStatus(_ctx: ExtensionContext) {
 		debugLog("modes", "status-update");
-		const t = ctx.ui.theme;
 		if (activeAgent) {
-			const label = t.fg("syntaxKeyword", `▸ ${activeAgent.name}`);
-			const model = activeAgent.model ? t.fg("muted", ` ${activeAgent.model}`) : "";
-			ctx.ui.setStatus(AGENT_BANNER_WIDGET, label + model);
 			publishMode(pi, { label: activeAgent.name, model: activeAgent.model });
 		} else if (agents.size > 0) {
-			ctx.ui.setStatus(
-				AGENT_BANNER_WIDGET,
-				t.fg("syntaxKeyword", "▸ ") + t.fg("muted", "pi"),
-			);
 			publishMode(pi, { label: "pi" });
 		} else {
-			ctx.ui.setStatus(AGENT_BANNER_WIDGET, undefined);
 			publishMode(pi, null);
 		}
 	}

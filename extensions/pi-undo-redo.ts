@@ -219,7 +219,6 @@ type RestoreBackup = { path: string; content?: Buffer };
 
 type GcState = { lastRunAt?: number };
 
-const STATUS_WIDGET_ID = "@kmiyh/pi-undo-redo/status";
 const GC_STATE_FILE = join(getAgentDir(), "pi-undo-redo", "gc-state.json");
 const AUTO_GC_MAX_BLOBS = 1_000;
 const AUTO_GC_MAX_BYTES = 100 * 1024 * 1024;
@@ -341,7 +340,6 @@ export default function undoRedoExtension(pi: ExtensionAPI) {
 
 	pi.on("session_shutdown", async (_event, ctx) => {
 		if (ctx.hasUI) {
-			ctx.ui.setStatus(STATUS_WIDGET_ID, undefined);
 			publishUndo(pi, null);
 			lastStatusCounts = undefined;
 		}
@@ -957,9 +955,6 @@ async function updateStatusWidget(pi: ExtensionAPI, ctx: ExtensionContext): Prom
 		return;
 	}
 	lastStatusCounts = counts;
-	const t = ctx.ui.theme;
-	const label = t.fg("muted", `↶${counts.undo} ↷${counts.redo}`);
-	ctx.ui.setStatus(STATUS_WIDGET_ID, label);
 	publishUndo(pi, { undos: counts.undo, redos: counts.redo });
 }
 

@@ -1,0 +1,234 @@
+/**
+ * Custom editor component — lifted from extensions/zentui.ts.
+ *
+ * Registers the PolishedEditor via ctx.ui.setEditorComponent and patches
+ * UserMessageComponent to render as a plain container.
+ *
+ * Call registerEditor(ctx, pi, handle, slots) on session_start after
+ * setupFooter has been called.
+ */
+
+import {
+	CustomEditor,
+	type ExtensionAPI,
+	type ExtensionContext,
+	type KeybindingsManager,
+	UserMessageComponent,
+} from "@mariozechner/pi-coding-agent";
+import {
+	type Component,
+	Container,
+	type EditorTheme,
+	type TUI,
+	truncateToWidth,
+	visibleWidth,
+} from "@mariozechner/pi-tui";
+import type { ModeState } from "./bus.js";
+import type { FooterHandle, ThemeLike } from "./footer.js";
+
+// ────────────────────────── helpers ──────────────────────────
+
+type AutocompleteEditorInternals = {
+	autocompleteList?: Pick<Component, "render">;
+	isShowingAutocomplete?: () => boolean;
+	autocompleteProvider?: unknown;
+};
+
+const TRUECOLOR_BACKGROUND_ANSI = /\x1b\[48;2;\d+;\d+;\d+m/g;
+const INDEXED_BACKGROUND_ANSI = /\x1b\[48;5;\d+m/g;
+const SIMPLE_BACKGROUND_ANSI = /\x1b\[(?:4\d|10[0-7]|49)m/g;
+
+function stripBackgroundAnsi(text: string): string {
+	return text
+		.replace(TRUECOLOR_BACKGROUND_ANSI, "")
+		.replace(INDEXED_BACKGROUND_ANSI, "")
+		.replace(SIMPLE_BACKGROUND_ANSI, "");
+}
+
+function fillStyledLine(content: string, width: number): string {
+	const truncated = truncateToWidth(stripBackgroundAnsi(content), width, "");
+	const padWidth = Math.max(0, width - visibleWidth(truncated));
+	return padWidth > 0 ? `${truncated}${" ".repeat(padWidth)}` : truncated;
+}
+
+// Render user messages as plain containers, bypassing pi's default styling.
+function patchUserMessageComponent(): void {
+	const prototype = UserMessageComponent.prototype as { render(width: number): string[] };
+	prototype.render = function (this: UserMessageComponent, width: number): string[] {
+		return Container.prototype.render.call(this, width) as string[];
+	};
+}
+
+// ────────────────────────── PolishedEditor ──────────────────────────
+
+import type { Theme } from "@mariozechner/pi-coding-agent";
+
+class PolishedEditor extends CustomEditor {
+	private readonly getModelMeta: () => string;
+	private readonly getThinkingLevel: () => string | undefined;
+	private readonly getAgentMeta: () => string | undefined;
+	private readonly getTopRightLabel: () => string | undefined;
+	private readonly uiTheme: Theme;
+	private readonly reset = "\x1b[0m";
+
+	constructor(
+		tui: TUI,
+		theme: EditorTheme,
+		keybindings: KeybindingsManager,
+		uiTheme: Theme,
+		getModelMeta: () => string,
+		getThinkingLevel: () => string | undefined,
+		getAgentMeta: () => string | undefined,
+		getTopRightLabel: () => string | undefined,
+	) {
+		super(tui, theme, keybindings, { paddingX: 0 });
+		this.borderColor = (text: string) => uiTheme.fg("border", text);
+		this.uiTheme = uiTheme;
+		this.getModelMeta = getModelMeta;
+		this.getThinkingLevel = getThinkingLevel;
+		this.getAgentMeta = getAgentMeta;
+		this.getTopRightLabel = getTopRightLabel;
+	}
+
+	private fillLine(content: string, width: number): string {
+		return fillStyledLine(content, width);
+	}
+
+	render(width: number): string[] {
+		const innerWidth = Math.max(1, width - 4);
+		const rendered = super.render(innerWidth);
+		const editorInternals = this as unknown as AutocompleteEditorInternals;
+		const isShowingAutocomplete =
+			typeof editorInternals.isShowingAutocomplete === "function"
+				? Boolean(editorInternals.isShowingAutocomplete())
+				: false;
+
+		if (rendered.length < 2) return super.render(width);
+
+		const { autocompleteList } = editorInternals;
+		const autocompleteCount =
+			isShowingAutocomplete && typeof autocompleteList?.render === "function"
+				? autocompleteList.render(innerWidth).length
+				: 0;
+		const editorFrame =
+			autocompleteCount > 0 && autocompleteCount < rendered.length
+				? rendered.slice(0, -autocompleteCount)
+				: rendered;
+		const autocompleteLines =
+			autocompleteCount > 0 && autocompleteCount < rendered.length
+				? rendered.slice(-autocompleteCount)
+				: [];
+
+		if (editorFrame.length < 2) return rendered;
+
+		const editorLines = editorFrame.slice(1, -1);
+		const metaParts = [this.getModelMeta()];
+		const thinkingLevel = this.getThinkingLevel();
+		if (thinkingLevel && thinkingLevel !== "off") {
+			metaParts.push(this.uiTheme.fg("muted", thinkingLevel));
+		}
+		const meta = metaParts.filter(Boolean).join(this.uiTheme.fg("border", "  "));
+		const agentMeta = this.getAgentMeta();
+		const metaLine = agentMeta
+			? (() => {
+					const leftW = visibleWidth(meta);
+					const rightW = visibleWidth(agentMeta);
+					const gap = innerWidth - leftW - rightW;
+					return gap >= 1 ? `${meta}${" ".repeat(gap)}${agentMeta}` : meta;
+				})()
+			: meta;
+
+		const isBashMode = this.getText().startsWith("!");
+		const railColor = isBashMode ? "mdCode" : "accent";
+		const borderColor = isBashMode ? "mdCode" : "border";
+		const textPrefix = isBashMode ? this.uiTheme.getFgAnsi("mdCode") : "";
+		const coloredEditorLines = editorLines.map((l) => (textPrefix ? `${textPrefix}${l}` : l));
+		const leftRail = `${this.uiTheme.fg(railColor, "│")}${this.reset} `;
+		const rightRail = ` ${this.uiTheme.fg(railColor, "│")}${this.reset}`;
+		const innerDashes = Math.max(0, width - 2);
+		const topRight = this.getTopRightLabel();
+		const topRightW = topRight ? visibleWidth(topRight) : 0;
+		let topMid: string;
+		if (topRight && innerDashes >= topRightW + 8) {
+			const rightPad = 2;
+			const leftDashes = innerDashes - topRightW - rightPad - 4;
+			topMid =
+				this.uiTheme.fg(borderColor, "─".repeat(leftDashes)) +
+				this.uiTheme.fg(borderColor, "┤") +
+				" " + topRight + " " +
+				this.uiTheme.fg(borderColor, "├") +
+				this.uiTheme.fg(borderColor, "─".repeat(rightPad));
+		} else {
+			topMid = this.uiTheme.fg(borderColor, "─".repeat(innerDashes));
+		}
+		const top = this.uiTheme.fg(railColor, "╭") + topMid + this.uiTheme.fg(railColor, "╮");
+		const bottom = this.uiTheme.fg(railColor, "╰") + this.uiTheme.fg(borderColor, "─".repeat(innerDashes)) + this.uiTheme.fg(railColor, "╯");
+		const lines = ["", ...coloredEditorLines, "", metaLine];
+
+		return [
+			top,
+			...lines.map((line) => `${leftRail}${this.fillLine(line, innerWidth)}${rightRail}`),
+			bottom,
+			...autocompleteLines,
+		];
+	}
+}
+
+// ────────────────────────── public API ──────────────────────────
+
+export function registerEditor(
+	ctx: ExtensionContext,
+	pi: ExtensionAPI,
+	handle: FooterHandle,
+	slots: Map<string, unknown>,
+): void {
+	patchUserMessageComponent();
+
+	let autocompleteFixed = false;
+	const uiTheme = ctx.ui.theme;
+
+	const editorFactory = (tui: TUI, theme: EditorTheme, keybindings: KeybindingsManager) => {
+		const editor = new PolishedEditor(
+			tui,
+			theme,
+			keybindings,
+			uiTheme,
+			() =>
+				[
+					uiTheme.fg("accent", handle.getModelLabel()),
+					uiTheme.fg("text", handle.getProviderLabel()),
+				].join(uiTheme.fg("borderMuted", "  ")),
+			() => {
+				try {
+					return pi.getThinkingLevel();
+				} catch {
+					return undefined;
+				}
+			},
+			() => {
+				const mode = slots.get("mode") as ModeState | undefined;
+				if (!mode) return undefined;
+				const label = uiTheme.fg("syntaxKeyword", `▸ ${mode.label}`);
+				const model = mode.model ? uiTheme.fg("muted", ` ${mode.model}`) : "";
+				return label + model;
+			},
+			() => handle.buildCwdGitSegment(uiTheme as unknown as ThemeLike),
+		);
+
+		const originalHandleInput = editor.handleInput.bind(editor);
+		editor.handleInput = (data: string) => {
+			const editorInternals = editor as unknown as AutocompleteEditorInternals;
+			if (!autocompleteFixed && !editorInternals.autocompleteProvider) {
+				autocompleteFixed = true;
+				ctx.ui.setEditorComponent(editorFactory);
+				editor.handleInput(data);
+				return;
+			}
+			originalHandleInput(data);
+		};
+
+		return editor;
+	};
+
+	ctx.ui.setEditorComponent(editorFactory);
+}

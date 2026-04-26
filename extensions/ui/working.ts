@@ -1,13 +1,11 @@
 /**
- * Working Messages Extension
+ * Working messages — lifted from extensions/working-messages.ts.
  *
- * Picks a random "Working..." message from a list each time pi starts responding.
- * The message is shown as a static working indicator while streaming.
- *
- * Customize MESSAGES below to add your own strings.
+ * Call setupWorking(pi) once at extension load time to register the
+ * session_start and request_start handlers that set the spinner and message.
  */
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 
 const MESSAGES = [
 	"Hyperspace charging...",
@@ -115,18 +113,17 @@ function pick<T>(arr: T[]): T {
 	return arr[Math.floor(Math.random() * arr.length)]!;
 }
 
-function makeFrames(ctx: { ui: { theme: { fg: (color: string, text: string) => string } } }) {
+function makeFrames(ctx: ExtensionContext): string[] {
 	return SPINNER_FRAMES.map((frame) => ctx.ui.theme.fg("dim", frame));
 }
 
-export default function (pi: ExtensionAPI) {
+export function setupWorking(pi: ExtensionAPI): void {
 	pi.on("session_start", (_event, ctx) => {
 		ctx.ui.setWorkingIndicator({ frames: makeFrames(ctx), intervalMs: 80 });
 		ctx.ui.setWorkingMessage(pick(MESSAGES));
 	});
 
-	pi.on("request_start", (_event, ctx) => {
-		// Pick a new random message each time the model starts responding
+	pi.on("agent_start", (_event, ctx) => {
 		ctx.ui.setWorkingMessage(pick(MESSAGES));
 	});
 }

@@ -5,7 +5,7 @@
       "id": "1",
       "subject": "Phase 0: Scaffolding & verification harness",
       "description": "Add tsconfig.json at repo root, scripts/check-build.sh, scripts/check-invariants.sh, scripts/smoke.sh, extensions/_debug.ts, and wire debug markers into existing extensions. Commit as Phase 0 on branch refactor/ui-orchestration.",
-      "status": "in_progress",
+      "status": "completed",
       "metadata": {
         "agentType": "general-purpose"
       },
@@ -14,13 +14,13 @@
       ],
       "blockedBy": [],
       "createdAt": 1777238016888,
-      "updatedAt": 1777238064958
+      "updatedAt": 1777238760521
     },
     {
       "id": "2",
       "subject": "Phase 1: Introduce UIBus + extensions/ui/ shell",
       "description": "Create extensions/ui/bus.ts with publishMode/publishUndo/publishOrchestration/publishWorking helpers. Create extensions/ui/index.ts that subscribes to harness.ui:publish, maintains slots Map, clears on reload. Register in harness manifest. Commit as Phase 1.",
-      "status": "pending",
+      "status": "completed",
       "metadata": {
         "agentType": "general-purpose"
       },
@@ -31,13 +31,13 @@
         "1"
       ],
       "createdAt": 1777238020588,
-      "updatedAt": 1777238046017
+      "updatedAt": 1777238876272
     },
     {
       "id": "3",
       "subject": "Phase 2: Migrate modes.ts and pi-undo-redo.ts to UIBus",
       "description": "Add publishMode/publishUndo calls alongside existing setStatus calls in modes.ts and pi-undo-redo.ts (dual-publish). Import from ./ui/bus.ts. Do not remove setStatus yet. Commit as Phase 2.",
-      "status": "pending",
+      "status": "completed",
       "metadata": {
         "agentType": "general-purpose"
       },
@@ -48,13 +48,13 @@
         "2"
       ],
       "createdAt": 1777238024105,
-      "updatedAt": 1777238046018
+      "updatedAt": 1777238989823
     },
     {
       "id": "4",
       "subject": "Phase 3: Lift footer/editor/working into extensions/ui/",
       "description": "Create extensions/ui/footer.ts, editor.ts, working.ts by lifting from zentui.ts and working-messages.ts. Delete zentui.ts and working-messages.ts. Remove dual-publish - only publishMode/publishUndo remain. Commit as Phase 3.",
-      "status": "pending",
+      "status": "in_progress",
       "metadata": {
         "agentType": "general-purpose"
       },
@@ -65,7 +65,7 @@
         "3"
       ],
       "createdAt": 1777238026717,
-      "updatedAt": 1777238046019
+      "updatedAt": 1777238989825
     },
     {
       "id": "5",

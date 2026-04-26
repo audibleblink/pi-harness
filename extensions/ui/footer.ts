@@ -1,27 +1,23 @@
+/**
+ * Footer rendering — lifted from extensions/zentui.ts.
+ *
+ * Manages git status, runtime detection, usage state, and installs the
+ * pi footer via ctx.ui.setFooter.  Reads undo state from the UIBus slots
+ * map rather than from extStatuses.
+ *
+ * Call setupFooter(ctx, slots) on session_start.
+ */
+
 import { execFile } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { promisify } from "node:util";
 import type { AssistantMessage } from "@mariozechner/pi-ai";
-import { debugLog } from "./_debug.js";
-import {
-	CustomEditor,
-	type ExtensionAPI,
-	type ExtensionContext,
-	getAgentDir,
-	type KeybindingsManager,
-	type Theme,
-	UserMessageComponent,
-} from "@mariozechner/pi-coding-agent";
-import {
-	type Component,
-	Container,
-	type EditorTheme,
-	type TUI,
-	truncateToWidth,
-	visibleWidth,
-} from "@mariozechner/pi-tui";
+import { debugLog } from "../_debug.js";
+import { type ExtensionContext, getAgentDir } from "@mariozechner/pi-coding-agent";
+import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
+import type { UndoState } from "./bus.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -149,15 +145,15 @@ function hexToAnsi(hex: string, isBackground = false): string {
 	return `\x1b[${isBackground ? 48 : 38};2;${r};${g};${b}m`;
 }
 
-type ThemeLike = { fg(color: string, text: string): string };
+export type ThemeLike = { fg(color: string, text: string): string };
 
-function colorize(theme: ThemeLike, color: ColorSpec, text: string): string {
+export function colorize(theme: ThemeLike, color: ColorSpec, text: string): string {
 	if (themeColorTokens.has(color)) return theme.fg(color, text);
 	if (isHexColor(color)) return `${hexToAnsi(color)}${text}\x1b[39m`;
 	return theme.fg("text", text);
 }
 
-function ensureConfigExists(): void {
+export function ensureConfigExists(): void {
 	try {
 		writeFileSync(configPath, `${JSON.stringify(defaultConfig, null, 2)}\n`, { encoding: "utf8", flag: "wx" });
 	} catch {
@@ -165,7 +161,7 @@ function ensureConfigExists(): void {
 	}
 }
 
-function loadConfig(): PolishedTuiConfig {
+export function loadConfig(): PolishedTuiConfig {
 	try {
 		const parsed = JSON.parse(readFileSync(configPath, "utf8")) as Partial<PolishedTuiConfig>;
 		return {
@@ -461,164 +457,7 @@ async function readRuntimeInfo(cwd: string): Promise<RuntimeInfo | undefined> {
 	return { name: runtime.name, symbol: runtime.symbol, version };
 }
 
-// ────────────────────────── ui ──────────────────────────
-
-type AutocompleteEditorInternals = {
-	autocompleteList?: Pick<Component, "render">;
-	isShowingAutocomplete?: () => boolean;
-	autocompleteProvider?: unknown;
-};
-
-const TRUECOLOR_BACKGROUND_ANSI = /\x1b\[48;2;\d+;\d+;\d+m/g;
-const INDEXED_BACKGROUND_ANSI = /\x1b\[48;5;\d+m/g;
-const SIMPLE_BACKGROUND_ANSI = /\x1b\[(?:4\d|10[0-7]|49)m/g;
-
-function stripBackgroundAnsi(text: string): string {
-	return text
-		.replace(TRUECOLOR_BACKGROUND_ANSI, "")
-		.replace(INDEXED_BACKGROUND_ANSI, "")
-		.replace(SIMPLE_BACKGROUND_ANSI, "");
-}
-
-function fillStyledLine(content: string, width: number): string {
-	const truncated = truncateToWidth(stripBackgroundAnsi(content), width, "");
-	const padWidth = Math.max(0, width - visibleWidth(truncated));
-	return padWidth > 0 ? `${truncated}${" ".repeat(padWidth)}` : truncated;
-}
-
-// Render user messages as plain containers, bypassing pi's default styling.
-function patchUserMessageComponent(): void {
-	const prototype = UserMessageComponent.prototype as { render(width: number): string[] };
-	prototype.render = function (this: UserMessageComponent, width: number): string[] {
-		return Container.prototype.render.call(this, width) as string[];
-	};
-}
-
-class PolishedEditor extends CustomEditor {
-	private readonly getModelMeta: () => string;
-	private readonly getThinkingLevel: () => string | undefined;
-	private readonly getAgentMeta: () => string | undefined;
-	private readonly getTopRightLabel: () => string | undefined;
-	private readonly uiTheme: Theme;
-	private readonly reset = "\x1b[0m";
-
-	constructor(
-		tui: TUI,
-		theme: EditorTheme,
-		keybindings: KeybindingsManager,
-		uiTheme: Theme,
-		getModelMeta: () => string,
-		getThinkingLevel: () => string | undefined,
-		getAgentMeta: () => string | undefined,
-		getTopRightLabel: () => string | undefined,
-	) {
-		super(tui, theme, keybindings, { paddingX: 0 });
-		this.borderColor = (text: string) => uiTheme.fg("border", text);
-		this.uiTheme = uiTheme;
-		this.getModelMeta = getModelMeta;
-		this.getThinkingLevel = getThinkingLevel;
-		this.getAgentMeta = getAgentMeta;
-		this.getTopRightLabel = getTopRightLabel;
-	}
-
-	private fillLine(content: string, width: number): string {
-		return fillStyledLine(content, width);
-	}
-
-	render(width: number): string[] {
-		const innerWidth = Math.max(1, width - 4);
-		const rendered = super.render(innerWidth);
-		const editorInternals = this as unknown as AutocompleteEditorInternals;
-		const isShowingAutocomplete =
-			typeof editorInternals.isShowingAutocomplete === "function"
-				? Boolean(editorInternals.isShowingAutocomplete())
-				: false;
-
-		if (rendered.length < 2) return super.render(width);
-
-		const { autocompleteList } = editorInternals;
-		const autocompleteCount =
-			isShowingAutocomplete && typeof autocompleteList?.render === "function"
-				? autocompleteList.render(innerWidth).length
-				: 0;
-		const editorFrame =
-			autocompleteCount > 0 && autocompleteCount < rendered.length
-				? rendered.slice(0, -autocompleteCount)
-				: rendered;
-		const autocompleteLines =
-			autocompleteCount > 0 && autocompleteCount < rendered.length
-				? rendered.slice(-autocompleteCount)
-				: [];
-
-		if (editorFrame.length < 2) return rendered;
-
-		const editorLines = editorFrame.slice(1, -1);
-		const metaParts = [this.getModelMeta()];
-		const thinkingLevel = this.getThinkingLevel();
-		if (thinkingLevel && thinkingLevel !== "off") {
-			metaParts.push(this.uiTheme.fg("muted", thinkingLevel));
-		}
-		const meta = metaParts.filter(Boolean).join(this.uiTheme.fg("border", "  "));
-		const agentMeta = this.getAgentMeta();
-		const metaLine = agentMeta
-			? (() => {
-					const leftW = visibleWidth(meta);
-					const rightW = visibleWidth(agentMeta);
-					const gap = innerWidth - leftW - rightW;
-					return gap >= 1 ? `${meta}${" ".repeat(gap)}${agentMeta}` : meta;
-				})()
-			: meta;
-
-		const isBashMode = this.getText().startsWith("!");
-		const railColor = isBashMode ? "mdCode" : "accent";
-		const borderColor = isBashMode ? "mdCode" : "border";
-		const textPrefix = isBashMode ? this.uiTheme.getFgAnsi("mdCode") : "";
-		const coloredEditorLines = editorLines.map((l) => (textPrefix ? `${textPrefix}${l}` : l));
-		const leftRail = `${this.uiTheme.fg(railColor, "│")}${this.reset} `;
-		const rightRail = ` ${this.uiTheme.fg(railColor, "│")}${this.reset}`;
-		const innerDashes = Math.max(0, width - 2);
-		const topRight = this.getTopRightLabel();
-		const topRightW = topRight ? visibleWidth(topRight) : 0;
-		let topMid: string;
-		if (topRight && innerDashes >= topRightW + 8) {
-			const rightPad = 2;
-			const leftDashes = innerDashes - topRightW - rightPad - 4;
-			topMid =
-				this.uiTheme.fg(borderColor, "─".repeat(leftDashes)) +
-				this.uiTheme.fg(borderColor, "┤") +
-				" " + topRight + " " +
-				this.uiTheme.fg(borderColor, "├") +
-				this.uiTheme.fg(borderColor, "─".repeat(rightPad));
-		} else {
-			topMid = this.uiTheme.fg(borderColor, "─".repeat(innerDashes));
-		}
-		const top = this.uiTheme.fg(railColor, "╭") + topMid + this.uiTheme.fg(railColor, "╮");
-		const bottom = this.uiTheme.fg(railColor, "╰") + this.uiTheme.fg(borderColor, "─".repeat(innerDashes)) + this.uiTheme.fg(railColor, "╯");
-		const lines = ["", ...coloredEditorLines, "", metaLine];
-
-		return [
-			top,
-			...lines.map((line) => `${leftRail}${this.fillLine(line, innerWidth)}${rightRail}`),
-			bottom,
-			...autocompleteLines,
-		];
-	}
-}
-
-// ────────────────────────── extension ──────────────────────────
-
-type FooterState = GitStatusSummary & {
-	modelLabel: string;
-	providerLabel: string;
-	contextLabel: string;
-	tokenLabel: string;
-	costLabel: string;
-	cwd: string;
-	contextPercent: number | null | undefined;
-	runtime?: RuntimeInfo;
-};
-
-type UsageTotals = { input: number; output: number; cost: number };
+// ────────────────────────── formatting helpers ──────────────────────────
 
 function formatCount(value: number): string {
 	if (value < 1000) return `${value}`;
@@ -640,6 +479,8 @@ function formatProviderLabel(provider: string | undefined): string {
 		known[provider] ?? provider.replace(/[-_]/g, " ").replace(/\b\w/g, (char) => char.toUpperCase())
 	);
 }
+
+type UsageTotals = { input: number; output: number; cost: number };
 
 function getUsageTotals(ctx: ExtensionContext): UsageTotals {
 	let input = 0;
@@ -697,7 +538,7 @@ function getRuntimeColorToken(runtime: RuntimeInfo | undefined): string {
 	}
 }
 
-function formatRuntimeSegment(theme: Pick<Theme, "fg">, runtime: RuntimeInfo | undefined): string {
+function formatRuntimeSegment(theme: ThemeLike, runtime: RuntimeInfo | undefined): string {
 	if (!runtime) return "";
 	const label = runtime.version ? `${runtime.symbol} ${runtime.version}` : runtime.symbol;
 	return `${colorize(theme, "text", "via")} ${colorize(theme, getRuntimeColorToken(runtime), label)}`;
@@ -708,7 +549,36 @@ function formatCwdLabel(cwd: string, cwdIcon: string): string {
 	return cwdIcon ? `${cwdIcon} ${last}` : last;
 }
 
-export default function (pi: ExtensionAPI) {
+// ────────────────────────── footer state ──────────────────────────
+
+type FooterState = GitStatusSummary & {
+	modelLabel: string;
+	providerLabel: string;
+	contextLabel: string;
+	tokenLabel: string;
+	costLabel: string;
+	cwd: string;
+	contextPercent: number | null | undefined;
+	runtime?: RuntimeInfo;
+};
+
+// ────────────────────────── public interface ──────────────────────────
+
+export interface FooterHandle {
+	syncState(ctx: ExtensionContext): void;
+	scheduleProjectRefresh(ctx: ExtensionContext): void;
+	refresh(): void;
+	getModelLabel(): string;
+	getProviderLabel(): string;
+	buildCwdGitSegment(theme: ThemeLike): string;
+}
+
+// ────────────────────────── setup ──────────────────────────
+
+export function setupFooter(ctx: ExtensionContext, slots: Map<string, unknown>): FooterHandle {
+	ensureConfigExists();
+	const currentConfig: PolishedTuiConfig = loadConfig();
+
 	const state: FooterState = {
 		modelLabel: "no-model",
 		providerLabel: "Unknown",
@@ -721,12 +591,7 @@ export default function (pi: ExtensionAPI) {
 		...emptyGitStatus(),
 	};
 
-	let currentConfig: PolishedTuiConfig = loadConfig();
 	let requestFooterRender: (() => void) | undefined;
-	let agentStatusText: string | undefined;
-	let undoStatusText: string | undefined;
-	const AGENT_STATUS_KEY = "agent-mode-banner";
-	const UNDO_STATUS_KEY = "@kmiyh/pi-undo-redo/status";
 
 	const buildCwdGitSegment = (theme: ThemeLike): string => {
 		const cwdLabel = colorize(
@@ -761,6 +626,7 @@ export default function (pi: ExtensionAPI) {
 		const branchLabel = `${colorize(theme, "text", "on")} ${gitIcon} ${gitColor(branch)}${statusBlock ? ` ${statusBlock}` : ""}`;
 		return `${cwdLabel} ${branchLabel}`;
 	};
+
 	let projectRefreshInFlight = false;
 	let projectRefreshPending = false;
 	let projectRefreshDebounceTimer: NodeJS.Timeout | undefined;
@@ -821,163 +687,86 @@ export default function (pi: ExtensionAPI) {
 		}, PROJECT_REFRESH_MIN_INTERVAL_MS - elapsed);
 	};
 
-	const installFooter = (ctx: ExtensionContext) => {
-		ctx.ui.setFooter((tui, theme, footerData) => {
-			requestFooterRender = () => tui.requestRender();
-			const unsubscribeBranch = footerData.onBranchChange(() => {
-				scheduleProjectRefresh(ctx);
-				tui.requestRender();
-			});
-			const separator = colorize(theme, currentConfig.colors.separator, " | ");
-
-			return {
-				dispose: () => {
-					unsubscribeBranch();
-					requestFooterRender = undefined;
-				},
-				invalidate() {},
-				render(width: number): string[] {
-					debugLog("zentui", "render");
-					const innerWidth = Math.max(1, width - 2);
-					const contextColor =
-						state.contextPercent !== null && state.contextPercent !== undefined
-							? state.contextPercent >= 90
-								? currentConfig.colors.contextError
-								: state.contextPercent >= 70
-									? currentConfig.colors.contextWarning
-									: currentConfig.colors.contextNormal
-							: currentConfig.colors.contextNormal;
-					const runtimeLabel = formatRuntimeSegment(theme, state.runtime);
-
-					const left = runtimeLabel;
-					const right = [
-						colorize(theme, contextColor, state.contextLabel),
-						colorize(theme, currentConfig.colors.tokens, state.tokenLabel),
-						colorize(theme, currentConfig.colors.cost, state.costLabel),
-						undoStatusText,
-					].filter(Boolean).join(separator);
-
-					const leftWidth = visibleWidth(left);
-					const rightWidth = visibleWidth(right);
-					const content = !left
-						? rightWidth >= innerWidth
-							? truncateToWidth(right, innerWidth)
-							: `${" ".repeat(innerWidth - rightWidth)}${right}`
-						: leftWidth >= innerWidth
-							? truncateToWidth(left, innerWidth)
-							: leftWidth + 1 + rightWidth <= innerWidth
-								? `${left}${" ".repeat(innerWidth - leftWidth - rightWidth)}${right}`
-								: left;
-					const lines = [` ${content} `];
-					const extStatuses = footerData.getExtensionStatuses();
-					agentStatusText = extStatuses.get(AGENT_STATUS_KEY);
-					undoStatusText = extStatuses.get(UNDO_STATUS_KEY);
-					const footerEntries = Array.from(extStatuses.entries()).filter(
-						([k]) => k !== AGENT_STATUS_KEY && k !== UNDO_STATUS_KEY,
-					);
-					if (footerEntries.length > 0) {
-						const statusLine = footerEntries
-							.sort(([a], [b]) => a.localeCompare(b))
-							.map(([, t]) => t.replace(/[\r\n\t]/g, " ").replace(/ +/g, " ").trim())
-							.join(separator);
-						lines.push(` ${truncateToWidth(statusLine, innerWidth)} `);
-					}
-					return lines;
-				},
-			};
+	ctx.ui.setFooter((tui, theme, footerData) => {
+		requestFooterRender = () => tui.requestRender();
+		const unsubscribeBranch = footerData.onBranchChange(() => {
+			scheduleProjectRefresh(ctx);
+			tui.requestRender();
 		});
-	};
+		const separator = colorize(theme, currentConfig.colors.separator, " | ");
 
-	const installEditor = (ctx: ExtensionContext) => {
-		let autocompleteFixed = false;
+		return {
+			dispose: () => {
+				unsubscribeBranch();
+				requestFooterRender = undefined;
+			},
+			invalidate() {},
+			render(width: number): string[] {
+				debugLog("ui", "footer-render");
+				const innerWidth = Math.max(1, width - 2);
 
-		const editorFactory = (tui: TUI, theme: EditorTheme, keybindings: KeybindingsManager) => {
-			const uiTheme = ctx.ui.theme;
-			const editor = new PolishedEditor(
-				tui,
-				theme,
-				keybindings,
-				uiTheme,
-				() =>
-					[
-						uiTheme.fg("accent", state.modelLabel),
-						uiTheme.fg("text", state.providerLabel),
-					].join(uiTheme.fg("borderMuted", "  ")),
-				() => {
-					try {
-						return pi.getThinkingLevel();
-					} catch {
-						return undefined;
-					}
-				},
-				() => agentStatusText,
-				() => buildCwdGitSegment(uiTheme),
-			);
+				// Undo state comes from the UIBus slot (not extStatuses)
+				const undoState = slots.get("undo") as UndoState | undefined;
+				const undoText = undoState
+					? theme.fg("muted", `↶${undoState.undos} ↷${undoState.redos}`)
+					: undefined;
 
-			const originalHandleInput = editor.handleInput.bind(editor);
-			editor.handleInput = (data: string) => {
-				const editorInternals = editor as unknown as AutocompleteEditorInternals;
-				if (!autocompleteFixed && !editorInternals.autocompleteProvider) {
-					autocompleteFixed = true;
-					ctx.ui.setEditorComponent(editorFactory);
-					editor.handleInput(data);
-					return;
+				const contextColor =
+					state.contextPercent !== null && state.contextPercent !== undefined
+						? state.contextPercent >= 90
+							? currentConfig.colors.contextError
+							: state.contextPercent >= 70
+								? currentConfig.colors.contextWarning
+								: currentConfig.colors.contextNormal
+						: currentConfig.colors.contextNormal;
+
+				const runtimeLabel = formatRuntimeSegment(theme, state.runtime);
+
+				const left = runtimeLabel;
+				const right = [
+					colorize(theme, contextColor, state.contextLabel),
+					colorize(theme, currentConfig.colors.tokens, state.tokenLabel),
+					colorize(theme, currentConfig.colors.cost, state.costLabel),
+					undoText,
+				].filter(Boolean).join(separator);
+
+				const leftWidth = visibleWidth(left);
+				const rightWidth = visibleWidth(right);
+				const content = !left
+					? rightWidth >= innerWidth
+						? truncateToWidth(right, innerWidth)
+						: `${" ".repeat(innerWidth - rightWidth)}${right}`
+					: leftWidth >= innerWidth
+						? truncateToWidth(left, innerWidth)
+						: leftWidth + 1 + rightWidth <= innerWidth
+							? `${left}${" ".repeat(innerWidth - leftWidth - rightWidth)}${right}`
+							: left;
+
+				const lines = [` ${content} `];
+
+				// Other ext statuses (e.g. pi-subagents "subagents" widget)
+				const extStatuses = footerData.getExtensionStatuses();
+				if (extStatuses.size > 0) {
+					const statusLine = Array.from(extStatuses.entries())
+						.sort(([a], [b]) => a.localeCompare(b))
+						.map(([, t]) => t.replace(/[\r\n\t]/g, " ").replace(/ +/g, " ").trim())
+						.join(separator);
+					lines.push(` ${truncateToWidth(statusLine, innerWidth)} `);
 				}
-				originalHandleInput(data);
-			};
 
-			return editor;
+				return lines;
+			},
 		};
+	});
 
-		ctx.ui.setEditorComponent(editorFactory);
+	syncState(ctx);
+
+	return {
+		syncState,
+		scheduleProjectRefresh,
+		refresh,
+		getModelLabel: () => state.modelLabel,
+		getProviderLabel: () => state.providerLabel,
+		buildCwdGitSegment,
 	};
-
-	const installUi = (ctx: ExtensionContext) => {
-		ensureConfigExists();
-		currentConfig = loadConfig();
-		patchUserMessageComponent();
-		syncState(ctx);
-		installFooter(ctx);
-		installEditor(ctx);
-		scheduleProjectRefresh(ctx);
-		refresh();
-	};
-
-	pi.on("session_start", async (_event, ctx) => {
-		installUi(ctx);
-	});
-
-	pi.on("agent_start", async (_event, ctx) => {
-		syncState(ctx);
-		refresh();
-	});
-
-	pi.on("agent_end", async (_event, ctx) => {
-		syncState(ctx);
-		scheduleProjectRefresh(ctx);
-		refresh();
-	});
-
-	pi.on("model_select", async (_event, ctx) => {
-		syncState(ctx);
-		refresh();
-	});
-
-	pi.on("message_end", async (_event, ctx) => {
-		syncState(ctx);
-		scheduleProjectRefresh(ctx);
-		refresh();
-	});
-
-	pi.on("tool_execution_end", async (_event, ctx) => {
-		syncState(ctx);
-		scheduleProjectRefresh(ctx);
-		refresh();
-	});
-
-	pi.on("session_compact", async (_event, ctx) => {
-		syncState(ctx);
-		scheduleProjectRefresh(ctx);
-		refresh();
-	});
 }
