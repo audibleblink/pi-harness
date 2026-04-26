@@ -7,10 +7,10 @@
 
 import type { AgentSession } from "@mariozechner/pi-coding-agent";
 import { type Component, matchesKey, type TUI, truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@mariozechner/pi-tui";
-import { extractText } from "../context.js";
-import type { AgentRecord } from "../types.js";
-import type { Theme } from "./agent-widget.js";
-import { type AgentActivity, describeActivity, formatDuration, formatTokens, getDisplayName, getPromptModeLabel } from "./agent-widget.js";
+import { extractText } from "./context.js";
+import type { AgentRecord } from "./types.js";
+import type { Theme } from "./agent-display.js";
+import { type AgentActivity, describeActivity, formatDuration, formatTokens, getDisplayName, getPromptModeLabel } from "./agent-display.js";
 
 /** Lines consumed by chrome: top border + header + header sep + footer sep + footer + bottom border. */
 const CHROME_LINES = 6;

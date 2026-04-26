@@ -27,11 +27,6 @@
   },
   "include": ["extensions/**/*.ts"],
   "exclude": [
-    // pi-subagents and pi-tasks are not registered in settings.json and have
-    // pre-existing type errors (unknown event names, params typed as unknown
-    // due to 'as any' schema casts) that require code changes to fix.
-    "extensions/pi-subagents",
-    "extensions/pi-tasks",
     // ask-user-question.ts: 'parameters: AskUserQuestionParams as any' causes
     // TParams to fall back to TSchema, making params unknown under strict mode.
     "extensions/ask-user-question.ts",

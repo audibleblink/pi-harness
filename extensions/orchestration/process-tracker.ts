@@ -6,7 +6,7 @@
  */
 
 import type { ChildProcess } from "node:child_process";
-import type { BackgroundProcess } from "./types.js";
+import type { BackgroundProcess } from "./task-types.js";
 
 export interface ProcessOutput {
   output: string;

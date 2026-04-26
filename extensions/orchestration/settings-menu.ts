@@ -8,7 +8,7 @@
 
 import { getSettingsListTheme } from "@mariozechner/pi-coding-agent";
 import { Container, type SettingItem, SettingsList, Spacer, Text } from "@mariozechner/pi-tui";
-import { saveTasksConfig, type TasksConfig } from "../tasks-config.js";
+import { saveTasksConfig, type TasksConfig } from "./tasks-config.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
