@@ -5,9 +5,16 @@
  * with YAML frontmatter, select a default agent, and have all prompts processed
  * through that agent with full real-time visibility.
  *
- * Agent definitions (merged, project overrides global):
- * - ~/.pi/agent/agents/*.md (global)
- * - <cwd>/.pi/agents/*.md (project-local)
+ * Agent definitions (merged, later sources override earlier ones):
+ * 1. <agentDir>/agents/*.md                  (global user — $PI_CODING_AGENT_DIR/agents)
+ * 2. <thisExtensionPackageRoot>/agents/*.md  (this package — e.g. pi-harness/agents)
+ * 3. <cwd>/.pi/agents/*.md                   (project-local)
+ *
+ * Pi has no built-in multi-path discovery for agent definitions (unlike skills),
+ * so this extension finds its own package root via import.meta.url and scans an
+ * `agents/` directory there. That makes agent .md files in the package that ships
+ * this extension (e.g. a pi-harness installed via settings.packages) discoverable
+ * without symlinks or extra config.
  *
  * Example agent file (e.g., ~/.pi/agent/agents/planner.md):
  * ```markdown
@@ -29,8 +36,9 @@
  * - Agent runs inline (same process) with full streaming visibility
  */
 
-import { readdirSync, readFileSync } from "node:fs";
-import { basename, join } from "node:path";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { Api, Model } from "@mariozechner/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { DynamicBorder, getAgentDir, parseFrontmatter } from "@mariozechner/pi-coding-agent";
@@ -60,7 +68,33 @@ interface OriginalState {
 const CLEAR_AGENT_KEY = "(none)";
 const AGENT_STATE_ENTRY_TYPE = "agent-state";
 const AGENT_BANNER_WIDGET = "agent-mode-banner";
-const NO_AGENTS_MSG = "No agents found. Create agent files in ~/.pi/agent/agents/ or .pi/agents/";
+const NO_AGENTS_MSG = "No agents found. Create agent files in <agentDir>/agents/, this package's agents/, or <cwd>/.pi/agents/";
+
+/**
+ * Resolve the package root that ships this extension by walking up from this
+ * file until we find a `package.json` or an `agents/` sibling. Returns
+ * undefined if neither is found before the filesystem root.
+ */
+function findExtensionPackageRoot(): string | undefined {
+	let dir: string;
+	try {
+		dir = dirname(fileURLToPath(import.meta.url));
+	} catch {
+		return undefined;
+	}
+
+	let prev = "";
+	while (dir && dir !== prev) {
+		if (existsSync(join(dir, "package.json")) || existsSync(join(dir, "agents"))) {
+			return dir;
+		}
+		prev = dir;
+		dir = dirname(dir);
+	}
+	return undefined;
+}
+
+const EXTENSION_PACKAGE_ROOT = findExtensionPackageRoot();
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -129,12 +163,14 @@ function parseAgentFile(filePath: string): AgentDefinition | undefined {
 
 function loadAgents(cwd: string): Map<string, AgentDefinition> {
 	const globalDir = join(getAgentDir(), "agents");
+	const packageDir = EXTENSION_PACKAGE_ROOT ? join(EXTENSION_PACKAGE_ROOT, "agents") : undefined;
 	const projectDir = join(cwd, ".pi", "agents");
 
-	// Project agents override global agents with the same name
-	const agents = new Map<string, AgentDefinition>();
+	// Later sources override earlier ones: global → package → project.
+	const dirs = [globalDir, packageDir, projectDir].filter((d): d is string => Boolean(d));
 
-	for (const dir of [globalDir, projectDir]) {
+	const agents = new Map<string, AgentDefinition>();
+	for (const dir of dirs) {
 		for (const file of findAgentFiles(dir)) {
 			const agent = parseAgentFile(file);
 			if (agent) agents.set(agent.name, agent);
