@@ -1,0 +1,82 @@
+/**
+ * UIBus producer module.
+ *
+ * Extensions emit typed state updates to named slots via a shared event
+ * channel. The ui extension subscribes to the channel and fans updates out
+ * to whatever renders the slots (e.g. status bar widgets).
+ */
+
+import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+
+// ─── Channel ──────────────────────────────────────────────────────────────────
+
+export const UI_BUS_TOPIC = "harness.ui:publish";
+
+// ─── Slot names ───────────────────────────────────────────────────────────────
+
+export const SLOT_MODE = "mode";
+export const SLOT_UNDO = "undo";
+export const SLOT_ORCHESTRATION = "orchestration";
+export const SLOT_WORKING = "working";
+
+// ─── Envelope ─────────────────────────────────────────────────────────────────
+
+export interface UiBusEnvelope {
+	slot: string;
+	value: unknown;
+}
+
+// ─── State types ──────────────────────────────────────────────────────────────
+
+export interface ModeState {
+	label: string;
+	model?: string;
+}
+
+export interface UndoState {
+	undos: number;
+	redos: number;
+}
+
+export interface AgentEntry {
+	id: string;
+	status: string;
+	elapsed: number;
+	activity: string;
+	model?: string;
+	taskId?: string;
+}
+
+export interface TaskEntry {
+	id: string;
+	subject: string;
+	status: string;
+	agentId?: string;
+}
+
+export interface OrchestrationState {
+	agents: AgentEntry[];
+	tasks: TaskEntry[];
+}
+
+export interface WorkingState {
+	message: string;
+}
+
+// ─── Producers ────────────────────────────────────────────────────────────────
+
+export function publishMode(pi: ExtensionAPI, state: ModeState | null): void {
+	pi.events.emit(UI_BUS_TOPIC, { slot: SLOT_MODE, value: state } satisfies UiBusEnvelope);
+}
+
+export function publishUndo(pi: ExtensionAPI, state: UndoState | null): void {
+	pi.events.emit(UI_BUS_TOPIC, { slot: SLOT_UNDO, value: state } satisfies UiBusEnvelope);
+}
+
+export function publishOrchestration(pi: ExtensionAPI, state: OrchestrationState | null): void {
+	pi.events.emit(UI_BUS_TOPIC, { slot: SLOT_ORCHESTRATION, value: state } satisfies UiBusEnvelope);
+}
+
+export function publishWorking(pi: ExtensionAPI, state: WorkingState | null): void {
+	pi.events.emit(UI_BUS_TOPIC, { slot: SLOT_WORKING, value: state } satisfies UiBusEnvelope);
+}
