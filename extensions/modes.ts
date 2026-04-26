@@ -363,12 +363,12 @@ export default function agentModeExtension(pi: ExtensionAPI) {
 				modelInfo +
 				toolsInfo;
 
-			ctx.ui.setWidget(AGENT_BANNER_WIDGET, [banner]);
+			ctx.ui.setStatus(AGENT_BANNER_WIDGET, banner);
 		} else if (agents.size > 0) {
 			const hint = ctx.ui.theme.fg("dim", "[No agent selected — /agent, Ctrl+Shift+M (cycle)]");
-			ctx.ui.setWidget(AGENT_BANNER_WIDGET, [hint]);
+			ctx.ui.setStatus(AGENT_BANNER_WIDGET, hint);
 		} else {
-			ctx.ui.setWidget(AGENT_BANNER_WIDGET, undefined);
+			ctx.ui.setStatus(AGENT_BANNER_WIDGET, undefined);
 		}
 	}
 

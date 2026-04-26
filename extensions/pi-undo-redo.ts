@@ -339,7 +339,7 @@ export default function undoRedoExtension(pi: ExtensionAPI) {
 
 	pi.on("session_shutdown", async (_event, ctx) => {
 		if (ctx.hasUI) {
-			ctx.ui.setWidget(STATUS_WIDGET_ID, undefined, { placement: "aboveEditor" });
+			ctx.ui.setStatus(STATUS_WIDGET_ID, undefined);
 			lastStatusCounts = undefined;
 		}
 	});
@@ -953,20 +953,16 @@ async function updateStatusWidget(ctx: ExtensionContext): Promise<void> {
 		return;
 	}
 	lastStatusCounts = counts;
-	const lines = buildStatusLines(state);
-	ctx.ui.setWidget(
-		STATUS_WIDGET_ID,
-		(_tui, theme) => new Text(lines.map((line) => theme.fg("dim", line)).join("\n"), 0, 0),
-		{ placement: "aboveEditor" },
-	);
+	const theme = ctx.ui.theme;
+	ctx.ui.setStatus(STATUS_WIDGET_ID, theme.fg("dim", buildStatusLine(state)));
 }
 
-function buildStatusLines(state: DerivedUndoRedoState): string[] {
+function buildStatusLine(state: DerivedUndoRedoState): string {
 	const undoCount = state.applied.length;
 	const redoCount = state.redo.length;
 	const undoLabel = `undo ${undoCount} step${undoCount === 1 ? "" : "s"} available`;
 	const redoLabel = `redo ${redoCount} step${redoCount === 1 ? "" : "s"} available`;
-	return [`${undoLabel} · ${redoLabel} · f8 undo/redo files`];
+	return `${undoLabel} · ${redoLabel} · f8 undo/redo files`;
 }
 
 async function validateTargets(targets: Map<string, BlobRef | undefined>): Promise<ValidationIssue[]> {
