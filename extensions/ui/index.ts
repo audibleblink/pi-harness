@@ -7,20 +7,50 @@
  * extension receives them and fans them out to the UI.
  */
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { debugLog } from "../_debug.js";
-import { UI_BUS_TOPIC, type UiBusEnvelope } from "./bus.js";
+import { UI_BUS_TOPIC, SLOT_ORCHESTRATION, type UiBusEnvelope, type OrchestrationState } from "./bus.js";
 import { setupFooter, type FooterHandle } from "./footer.js";
 import { registerEditor } from "./editor.js";
 import { setupWorking } from "./working.js";
+import { createTicker } from "./ticker.js";
+import { renderWidget, hasAnimatedState } from "./widget.js";
 
 export default function uiExtension(pi: ExtensionAPI) {
 	const slots = new Map<string, unknown>();
 	let handle: FooterHandle | undefined;
 	let unsubscribeBus: (() => void) | undefined;
+	let currentCtx: ExtensionContext | undefined;
+	let frame = 0;
+
+	const ticker = createTicker(() => {
+		frame++;
+		renderAndSetWidget();
+	});
+
+	function renderAndSetWidget(): void {
+		if (!currentCtx) return;
+		const state = slots.get(SLOT_ORCHESTRATION) as OrchestrationState | null | undefined;
+		if (!state) {
+			currentCtx.ui.setWidget(SLOT_ORCHESTRATION, undefined);
+			return;
+		}
+		const lines = renderWidget(state, frame).split("\n");
+		currentCtx.ui.setWidget(SLOT_ORCHESTRATION, lines, { placement: "aboveEditor" });
+	}
 
 	function onSlotChanged(slot: string): void {
 		debugLog("ui", "slot-changed", { slot });
+		if (slot === SLOT_ORCHESTRATION) {
+			const state = slots.get(SLOT_ORCHESTRATION) as OrchestrationState | null | undefined;
+			if (!state || !hasAnimatedState(state)) {
+				ticker.stop();
+			} else if (!ticker.isRunning()) {
+				ticker.start();
+			}
+			renderAndSetWidget();
+			return;
+		}
 		handle?.refresh();
 	}
 
@@ -42,9 +72,12 @@ export default function uiExtension(pi: ExtensionAPI) {
 
 	pi.on("session_start", async (event, ctx) => {
 		if (event.reason === "reload") {
+			ticker.stop();
+			frame = 0;
 			slots.clear();
 			debugLog("ui", "slots-cleared", { reason: "reload" });
 		}
+		currentCtx = ctx;
 		handle = setupFooter(ctx, slots);
 		registerEditor(ctx, pi, handle, slots);
 		handle.scheduleProjectRefresh(ctx);
@@ -86,6 +119,7 @@ export default function uiExtension(pi: ExtensionAPI) {
 	});
 
 	pi.on("session_shutdown", async () => {
+		ticker.stop();
 		unsubscribeBus?.();
 		unsubscribeBus = undefined;
 	});
