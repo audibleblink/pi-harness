@@ -1,4 +1,5 @@
-// animation ticker: 80ms for widget spinner/elapsed
+/** Interval for the animation ticker (spinner + elapsed). */
+export const TICK_INTERVAL_MS = 80;
 
 export interface Ticker {
 	start(): void;
@@ -12,7 +13,7 @@ export function createTicker(onTick: () => void): Ticker {
 	return {
 		start() {
 			if (timer !== undefined) return;
-			timer = setInterval(onTick, 80);
+			timer = setInterval(onTick, TICK_INTERVAL_MS);
 		},
 		stop() {
 			if (timer === undefined) return;

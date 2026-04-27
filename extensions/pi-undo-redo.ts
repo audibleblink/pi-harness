@@ -340,7 +340,8 @@ export default function undoRedoExtension(pi: ExtensionAPI) {
 	pi.on("session_shutdown", async (_event, ctx) => {
 		if (ctx.hasUI) {
 			publishUndo(pi, null);
-			lastStatusCounts = undefined;
+			lastUndoCount = -1;
+			lastRedoCount = -1;
 		}
 	});
 
@@ -939,21 +940,18 @@ function collectBlobIdsFromEntries(
 	}
 }
 
-let lastStatusCounts: { undo: number; redo: number } | undefined;
+let lastUndoCount = -1;
+let lastRedoCount = -1;
 
 async function updateStatusWidget(pi: ExtensionAPI, ctx: ExtensionContext): Promise<void> {
 	if (!ctx.hasUI) return;
 	const state = deriveUndoRedoState(ctx.sessionManager.getBranch());
-	const counts = { undo: state.applied.length, redo: state.redo.length };
-	if (
-		lastStatusCounts &&
-		lastStatusCounts.undo === counts.undo &&
-		lastStatusCounts.redo === counts.redo
-	) {
-		return;
-	}
-	lastStatusCounts = counts;
-	publishUndo(pi, { undos: counts.undo, redos: counts.redo });
+	const undos = state.applied.length;
+	const redos = state.redo.length;
+	if (undos === lastUndoCount && redos === lastRedoCount) return;
+	lastUndoCount = undos;
+	lastRedoCount = redos;
+	publishUndo(pi, { undos, redos });
 }
 
 async function validateTargets(targets: Map<string, BlobRef | undefined>): Promise<ValidationIssue[]> {

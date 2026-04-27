@@ -146,13 +146,11 @@ export class TaskStore {
   }
 
   get(id: string): Task | undefined {
-    if (this.filePath) this.load();
     return this.tasks.get(id);
   }
 
   /** List all tasks sorted by ID ascending. */
   list(): Task[] {
-    if (this.filePath) this.load();
     return Array.from(this.tasks.values()).sort((a, b) => Number(a.id) - Number(b.id));
   }
 
@@ -217,49 +215,39 @@ export class TaskStore {
         changedFields.push("metadata");
       }
 
-      // Bidirectional dependency edges
-      if (fields.addBlocks && fields.addBlocks.length > 0) {
-        for (const targetId of fields.addBlocks) {
-          if (!task.blocks.includes(targetId)) {
-            task.blocks.push(targetId);
-          }
+      // Add a set of directed edges (addBlocks or addBlockedBy).
+      // field/reverse: which list on task vs target to update.
+      // cycleCheckList: the task's opposite-direction list, used to detect mutual blocking.
+      const addEdges = (
+        field: "blocks" | "blockedBy",
+        reverse: "blockedBy" | "blocks",
+        cycleCheckList: string[],
+        targetIds: string[],
+      ) => {
+        for (const targetId of targetIds) {
+          if (!task[field].includes(targetId)) task[field].push(targetId);
           const target = this.tasks.get(targetId);
-          if (target && !target.blockedBy.includes(id)) {
-            target.blockedBy.push(id);
+          if (target && !target[reverse].includes(id)) {
+            target[reverse].push(id);
             target.updatedAt = Date.now();
           }
-          // Warnings for problematic edges
           if (targetId === id) {
             warnings.push(`#${id} blocks itself`);
           } else if (!target) {
             warnings.push(`#${targetId} does not exist`);
-          } else if (target.blocks.includes(id)) {
+          } else if (cycleCheckList.includes(targetId)) {
             warnings.push(`cycle: #${id} and #${targetId} block each other`);
           }
         }
-        changedFields.push("blocks");
+        changedFields.push(field);
+      };
+
+      if (fields.addBlocks?.length) {
+        addEdges("blocks", "blockedBy", task.blockedBy, fields.addBlocks);
       }
 
-      if (fields.addBlockedBy && fields.addBlockedBy.length > 0) {
-        for (const targetId of fields.addBlockedBy) {
-          if (!task.blockedBy.includes(targetId)) {
-            task.blockedBy.push(targetId);
-          }
-          const target = this.tasks.get(targetId);
-          if (target && !target.blocks.includes(id)) {
-            target.blocks.push(id);
-            target.updatedAt = Date.now();
-          }
-          // Warnings for problematic edges
-          if (targetId === id) {
-            warnings.push(`#${id} blocks itself`);
-          } else if (!target) {
-            warnings.push(`#${targetId} does not exist`);
-          } else if (task.blocks.includes(targetId)) {
-            warnings.push(`cycle: #${id} and #${targetId} block each other`);
-          }
-        }
-        changedFields.push("blockedBy");
+      if (fields.addBlockedBy?.length) {
+        addEdges("blockedBy", "blocks", task.blocks, fields.addBlockedBy);
       }
 
       task.updatedAt = Date.now();

@@ -7,6 +7,7 @@
 
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { SPINNER } from "../orchestration/agent-display.js";
+import { TICK_INTERVAL_MS } from "./ticker.js";
 
 const MESSAGES = [
 	"Hyperspace charging...",
@@ -118,7 +119,7 @@ function makeFrames(ctx: ExtensionContext): string[] {
 
 export function setupWorking(pi: ExtensionAPI): void {
 	pi.on("session_start", (_event, ctx) => {
-		ctx.ui.setWorkingIndicator({ frames: makeFrames(ctx), intervalMs: 80 });
+		ctx.ui.setWorkingIndicator({ frames: makeFrames(ctx), intervalMs: TICK_INTERVAL_MS });
 		ctx.ui.setWorkingMessage(pick(MESSAGES));
 	});
 

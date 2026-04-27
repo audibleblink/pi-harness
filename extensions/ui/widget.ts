@@ -70,15 +70,17 @@ export function hasAnimatedState(state: OrchestrationState): boolean {
 	return false;
 }
 
-/**
- * Render the full orchestration widget as a multi-line string.
- * `frame` is the current spinner frame index (incremented each tick).
- */
-export function renderWidget(state: OrchestrationState, frame: number): string {
-	const lines: string[] = [];
+/** Cached task grouping — only rebuilt when the state reference changes. */
+let lastState: OrchestrationState | undefined;
+let cachedTasksByAgent: Map<string, TaskEntry[]> = new Map();
+let cachedOrphanTasks: TaskEntry[] = [];
 
+function groupTasks(state: OrchestrationState): {
+	tasksByAgent: Map<string, TaskEntry[]>;
+	orphanTasks: TaskEntry[];
+} {
+	if (state === lastState) return { tasksByAgent: cachedTasksByAgent, orphanTasks: cachedOrphanTasks };
 	const activeAgentIds = new Set(state.agents.map(a => a.id));
-
 	const tasksByAgent = new Map<string, TaskEntry[]>();
 	const orphanTasks: TaskEntry[] = [];
 	for (const task of state.tasks) {
@@ -90,6 +92,19 @@ export function renderWidget(state: OrchestrationState, frame: number): string {
 			orphanTasks.push(task);
 		}
 	}
+	lastState = state;
+	cachedTasksByAgent = tasksByAgent;
+	cachedOrphanTasks = orphanTasks;
+	return { tasksByAgent, orphanTasks };
+}
+
+/**
+ * Render the full orchestration widget as a multi-line string.
+ * `frame` is the current spinner frame index (incremented each tick).
+ */
+export function renderWidget(state: OrchestrationState, frame: number): string {
+	const lines: string[] = [];
+	const { tasksByAgent, orphanTasks } = groupTasks(state);
 
 	for (const agent of state.agents) {
 		lines.push(renderAgent(agent, frame));

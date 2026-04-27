@@ -20,25 +20,16 @@ export interface PreloadedSkill {
  *
  * @param skillNames  List of skill names to preload.
  * @param cwd         Working directory for project-level skills.
- * @returns Array of loaded skills (missing skills are skipped with a warning comment).
+ * @returns Array of loaded skills. Unsafe names and missing skills are silently omitted.
  */
 export function preloadSkills(skillNames: string[], cwd: string): PreloadedSkill[] {
   const results: PreloadedSkill[] = [];
 
   for (const name of skillNames) {
-    // Unlike memory (which throws on unsafe names because it's part of agent setup),
-    // skills are optional — skip gracefully to avoid blocking agent startup.
-    if (isUnsafeName(name)) {
-      results.push({ name, content: `(Skill "${name}" skipped: name contains path traversal characters)` });
-      continue;
-    }
+    if (isUnsafeName(name)) continue; // skip unsafe names silently
     const content = findAndReadSkill(name, cwd);
-    if (content !== undefined) {
-      results.push({ name, content });
-    } else {
-      // Include a note about missing skills so the agent knows it was requested but not found
-      results.push({ name, content: `(Skill "${name}" not found in .pi/skills/ or ~/.pi/skills/)` });
-    }
+    if (content !== undefined) results.push({ name, content });
+    // missing skills are silently omitted — no placeholder injected into the prompt
   }
 
   return results;
