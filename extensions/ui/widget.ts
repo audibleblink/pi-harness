@@ -5,7 +5,7 @@
  * icon + subject) as a combined multi-line string for ctx.ui.setWidget.
  */
 
-import type { OrchestrationState, AgentEntry, TaskEntry } from "./bus.js";
+import type { OrchestrationState, AgentEntry, TaskEntry, SubagentUsageState } from "./bus.js";
 import { SPINNER, formatMs } from "../orchestration/agent-display.js";
 
 // ─── ANSI helpers ─────────────────────────────────────────────────────────────
@@ -33,6 +33,12 @@ function taskIcon(status: string): string {
 	if (status === "completed") return green("✓");
 	if (status === "in_progress") return yellow("⟳");
 	return dim("·");
+}
+
+function formatCount(value: number): string {
+	if (value < 1000) return `${value}`;
+	if (value < 10_000) return `${(value / 1000).toFixed(1)}k`;
+	return `${Math.round(value / 1000)}k`;
 }
 
 function taskStatusLabel(status: string): string {
@@ -102,7 +108,7 @@ function groupTasks(state: OrchestrationState): {
  * Render the full orchestration widget as a multi-line string.
  * `frame` is the current spinner frame index (incremented each tick).
  */
-export function renderWidget(state: OrchestrationState, frame: number): string {
+export function renderWidget(state: OrchestrationState, frame: number, sub?: SubagentUsageState | null): string {
 	const lines: string[] = [];
 	const { tasksByAgent, orphanTasks } = groupTasks(state);
 
@@ -116,6 +122,10 @@ export function renderWidget(state: OrchestrationState, frame: number): string {
 
 	for (const task of orphanTasks) {
 		lines.push(renderTask(task, false));
+	}
+
+	if (sub && sub.cost > 0) {
+		lines.push(`${dim("⊕ agents:")} ${formatCount(sub.tokens)} $${sub.cost.toFixed(3)}`);
 	}
 
 	return lines.join("\n");

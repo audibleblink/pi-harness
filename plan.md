@@ -142,12 +142,12 @@ End state: spawning a paid subagent visibly causes a `Σ` in the footer cost. Wi
 Add the `⊕ agents: <tokens> $<cost>` aggregate line to `extensions/ui/widget.ts`, gated on `cost > 0`. Run the full repo verification surface.
 
 ### Tasks
-- [ ] Update `renderWidget(state, frame)` signature in `extensions/ui/widget.ts` to `renderWidget(state, frame, sub?: SubagentUsageState | null)`.
-- [ ] At the very bottom of the widget output (after orphan tasks per §4.4), if `sub && sub.cost > 0`, append a single dim line: `⊕ agents: <formatCount(sub.tokens)> $<sub.cost.toFixed(3)>`. Both `⊕` and `agents:` are dimmed; whitespace and ordering match §4.4 exactly.
-- [ ] If `cost === 0` or `sub` is null/undefined, render nothing extra (byte-identical to today).
-- [ ] In `extensions/ui/index.ts`, read `slots.get(SLOT_SUBAGENT_USAGE)` and pass it through every `renderWidget(...)` call site. Search the file for all call sites — there may be more than one.
-- [ ] If Phase 4 chose to export `formatCount`, import it; otherwise inline a local copy. No third path.
-- [ ] Run the full check matrix and the smoke boot.
+- [x] Update `renderWidget(state, frame)` signature in `extensions/ui/widget.ts` to `renderWidget(state, frame, sub?: SubagentUsageState | null)`.
+- [x] At the very bottom of the widget output (after orphan tasks per §4.4), if `sub && sub.cost > 0`, append a single dim line: `⊕ agents: <formatCount(sub.tokens)> $<sub.cost.toFixed(3)>`. Both `⊕` and `agents:` are dimmed; whitespace and ordering match §4.4 exactly.
+- [x] If `cost === 0` or `sub` is null/undefined, render nothing extra (byte-identical to today).
+- [x] In `extensions/ui/index.ts`, read `slots.get(SLOT_SUBAGENT_USAGE)` and pass it through every `renderWidget(...)` call site. Search the file for all call sites — there may be more than one.
+- [x] If Phase 4 chose to export `formatCount`, import it; otherwise inline a local copy. No third path.
+- [x] Run the full check matrix and the smoke boot.
 
 ### Autonomous check (end of phase)
 ```bash

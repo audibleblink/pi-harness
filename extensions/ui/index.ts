@@ -8,7 +8,7 @@
  */
 
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { UI_BUS_TOPIC, SLOT_MODE, SLOT_ORCHESTRATION, type UiBusEnvelope, type OrchestrationState } from "./bus.js";
+import { UI_BUS_TOPIC, SLOT_MODE, SLOT_ORCHESTRATION, SLOT_SUBAGENT_USAGE, type UiBusEnvelope, type OrchestrationState, type SubagentUsageState } from "./bus.js";
 import { setupFooter, type FooterHandle } from "./footer.js";
 import { registerEditor } from "./editor.js";
 import { setupWorking } from "./working.js";
@@ -35,7 +35,8 @@ export default function uiExtension(pi: ExtensionAPI) {
 			currentCtx.ui.setWidget(SLOT_ORCHESTRATION, undefined);
 			return;
 		}
-		const lines = renderWidget(state, frame).split("\n");
+		const sub = slots.get(SLOT_SUBAGENT_USAGE) as SubagentUsageState | null | undefined;
+		const lines = renderWidget(state, frame, sub ?? null).split("\n");
 		currentCtx.ui.setWidget(SLOT_ORCHESTRATION, lines, { placement: "aboveEditor" });
 	}
 
