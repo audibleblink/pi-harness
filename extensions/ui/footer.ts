@@ -16,7 +16,7 @@ import { promisify } from "node:util";
 import type { AssistantMessage } from "@mariozechner/pi-ai";
 import { type ExtensionContext, getAgentDir } from "@mariozechner/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
-import { SLOT_UNDO, type UndoState } from "./bus.js";
+import { SLOT_SUBAGENT_USAGE, SLOT_UNDO, type SubagentUsageState, type UndoState } from "./bus.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -481,7 +481,7 @@ function formatProviderLabel(provider: string | undefined): string {
 
 type UsageTotals = { input: number; output: number; cost: number };
 
-function getUsageTotals(ctx: ExtensionContext): UsageTotals {
+function getParentUsageTotals(ctx: ExtensionContext): UsageTotals {
 	let input = 0;
 	let output = 0;
 	let cost = 0;
@@ -493,6 +493,28 @@ function getUsageTotals(ctx: ExtensionContext): UsageTotals {
 		cost += message.usage?.cost?.total ?? 0;
 	}
 	return { input, output, cost };
+}
+
+function getCombinedUsageTotals(
+	ctx: ExtensionContext,
+	sub: SubagentUsageState | null,
+): {
+	parent: UsageTotals;
+	combined: UsageTotals;
+	subTokens: number;
+	subCost: number;
+} {
+	const parent = getParentUsageTotals(ctx);
+	return {
+		parent,
+		combined: {
+			input: parent.input,
+			output: parent.output,
+			cost: parent.cost + (sub?.cost ?? 0),
+		},
+		subTokens: sub?.tokens ?? 0,
+		subCost: sub?.cost ?? 0,
+	};
 }
 
 function buildTokenLabel(totals: UsageTotals): string {
@@ -635,7 +657,7 @@ export function setupFooter(ctx: ExtensionContext, slots: Map<string, unknown>):
 	const refresh = () => requestFooterRender?.();
 
 	const syncState = (ctx: ExtensionContext) => {
-		const totals = getUsageTotals(ctx);
+		const totals = getParentUsageTotals(ctx);
 		const usage = ctx.getContextUsage();
 		const contextWindow = ctx.model?.contextWindow ?? usage?.contextWindow;
 		state.modelLabel = ctx.model?.id ?? "no-model";
@@ -708,6 +730,17 @@ export function setupFooter(ctx: ExtensionContext, slots: Map<string, unknown>):
 					? theme.fg("muted", `↶${undoState.undos} ↷${undoState.redos}`)
 					: undefined;
 
+				const sub = slots.get(SLOT_SUBAGENT_USAGE) as SubagentUsageState | null | undefined;
+				const subCost = sub?.cost ?? 0;
+				let costSegment: string;
+				if (subCost > 0) {
+					const { combined } = getCombinedUsageTotals(ctx, sub ?? null);
+					const dollarStr = `$${combined.cost.toFixed(3)}`;
+					costSegment = `${theme.fg("muted", "Σ")}${colorize(theme, currentConfig.colors.cost, dollarStr)}`;
+				} else {
+					costSegment = colorize(theme, currentConfig.colors.cost, state.costLabel);
+				}
+
 				const contextColor =
 					state.contextPercent !== null && state.contextPercent !== undefined
 						? state.contextPercent >= 90
@@ -723,7 +756,7 @@ export function setupFooter(ctx: ExtensionContext, slots: Map<string, unknown>):
 				const right = [
 					colorize(theme, contextColor, state.contextLabel),
 					colorize(theme, currentConfig.colors.tokens, state.tokenLabel),
-					colorize(theme, currentConfig.colors.cost, state.costLabel),
+					costSegment,
 					undoText,
 				].filter(Boolean).join(separator);
 

@@ -112,13 +112,13 @@ End state: a real `SubagentUsageState` flows on the bus on every relevant tick. 
 Wire `extensions/ui/footer.ts` to read the slot and conditionally prefix the cost label with `Σ`. Token labels stay parent-only per §4.3.
 
 ### Tasks
-- [ ] Read `extensions/ui/footer.ts` and `extensions/ui/index.ts` to confirm how `slots` is plumbed into `setupFooter`.
-- [ ] Rename internal `getUsageTotals(ctx)` → `getParentUsageTotals(ctx)`. Update its single in-file caller. Do not change behavior.
-- [ ] Add `getCombinedUsageTotals(ctx, sub: SubagentUsageState | null)` returning `{ parent, combined: { input, output, cost: parent.cost + (sub?.cost ?? 0) }, subTokens, subCost }` exactly as specified in §4.3.
-- [ ] In the footer render path, read `slots.get(SLOT_SUBAGENT_USAGE)` (typed as `SubagentUsageState | null | undefined`).
-- [ ] Compute `costLabel`: when `subCost > 0` prefix the existing dollar string with `Σ` (dimmed to match the muted style; reuse the same dim helper the footer already uses for muted text). Otherwise render exactly today's string.
-- [ ] Leave `↑in ↓out` untouched — they remain parent-only.
-- [ ] Export `formatCount` (used in Phase 5) **only if** that ends up being the chosen sharing path; otherwise leave private and Phase 5 reimplements. Decide here, not later.
+- [x] Read `extensions/ui/footer.ts` and `extensions/ui/index.ts` to confirm how `slots` is plumbed into `setupFooter`.
+- [x] Rename internal `getUsageTotals(ctx)` → `getParentUsageTotals(ctx)`. Update its single in-file caller. Do not change behavior.
+- [x] Add `getCombinedUsageTotals(ctx, sub: SubagentUsageState | null)` returning `{ parent, combined: { input, output, cost: parent.cost + (sub?.cost ?? 0) }, subTokens, subCost }` exactly as specified in §4.3.
+- [x] In the footer render path, read `slots.get(SLOT_SUBAGENT_USAGE)` (typed as `SubagentUsageState | null | undefined`).
+- [x] Compute `costLabel`: when `subCost > 0` prefix the existing dollar string with `Σ` (dimmed to match the muted style; reuse the same dim helper the footer already uses for muted text). Otherwise render exactly today's string.
+- [x] Leave `↑in ↓out` untouched — they remain parent-only.
+- [x] Export `formatCount` (used in Phase 5) **only if** that ends up being the chosen sharing path; otherwise leave private and Phase 5 reimplements. Decide here, not later.
 
 ### Autonomous check (end of phase)
 ```bash
