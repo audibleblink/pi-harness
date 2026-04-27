@@ -75,19 +75,19 @@ All commands must succeed. End state: every completed/failed agent record carrie
 Wire the orchestration extension to compute and publish `SubagentUsageState`. Adds the session-scoped `completedSubagentTotals` accumulator, the resume-aware double-count guard, and calls `publishSubagentUsage` at every site that already calls `scheduleOrchestrationPublish`.
 
 ### Tasks
-- [ ] In `extensions/orchestration/index.ts`, add a module/instance-scoped `completedSubagentTotals = { tokens: 0, cost: 0 }`.
-- [ ] Implement `safeTotalCost(session)` and `safeUsage(session): { tokens: number; cost: number }` next to the existing `safeTotalTokens`. Same try/catch shape; return zeros on failure.
-- [ ] On agent completion (the same callback flow used in Phase 2, exposed via a hook from `AgentManager` or polled — match whatever pattern orchestration already uses to learn about completions): add the agent's `finalTokens`/`finalCost` to `completedSubagentTotals`. Do this exactly once per terminal completion.
-- [ ] On `manager.resume(record)`: if `record.finalTokens`/`finalCost` are populated, subtract them from `completedSubagentTotals` and clear the fields before re-running. This implements the §7 resume rule — without it, money leaks.
-- [ ] On `session_start` (the existing hook that calls `manager.clearCompleted()`): reset `completedSubagentTotals = { tokens: 0, cost: 0 }` in the same call site.
-- [ ] Add `buildSubagentUsageState(): SubagentUsageState | null`:
+- [x] In `extensions/orchestration/index.ts`, add a module/instance-scoped `completedSubagentTotals = { tokens: 0, cost: 0 }`.
+- [x] Implement `safeTotalCost(session)` and `safeUsage(session): { tokens: number; cost: number }` next to the existing `safeTotalTokens`. Same try/catch shape; return zeros on failure.
+- [x] On agent completion (the same callback flow used in Phase 2, exposed via a hook from `AgentManager` or polled — match whatever pattern orchestration already uses to learn about completions): add the agent's `finalTokens`/`finalCost` to `completedSubagentTotals`. Do this exactly once per terminal completion.
+- [x] On `manager.resume(record)`: if `record.finalTokens`/`finalCost` are populated, subtract them from `completedSubagentTotals` and clear the fields before re-running. This implements the §7 resume rule — without it, money leaks.
+- [x] On `session_start` (the existing hook that calls `manager.clearCompleted()`): reset `completedSubagentTotals = { tokens: 0, cost: 0 }` in the same call site.
+- [x] Add `buildSubagentUsageState(): SubagentUsageState | null`:
   - Live sum: for each `record` in `manager.listAgents()` with `status` ∈ {`running`, `queued`}, add `safeUsage(record.session)`.
   - Completed: add `completedSubagentTotals`.
   - `runningCount` = count of records with status === `running`.
   - Return `null` iff `completedSubagentTotals` is `{0,0}` AND no running/queued agents exist.
-- [ ] Add `scheduleSubagentUsagePublish()` mirroring `scheduleOrchestrationPublish` (50 ms debounce). Sharing the same timer is acceptable; either approach is fine as long as both publish after the debounce.
-- [ ] At every existing call site of `scheduleOrchestrationPublish()` — spawn, completion, abort, tool activity tick, turn end, `session_start` — also call `scheduleSubagentUsagePublish()`.
-- [ ] Verify: orchestration must not import from `extensions/ui/footer.ts` or `extensions/ui/widget.ts`. Importing the slot constant from `extensions/ui/bus.ts` is allowed (existing pattern for `SLOT_ORCHESTRATION`).
+- [x] Add `scheduleSubagentUsagePublish()` mirroring `scheduleOrchestrationPublish` (50 ms debounce). Sharing the same timer is acceptable; either approach is fine as long as both publish after the debounce.
+- [x] At every existing call site of `scheduleOrchestrationPublish()` — spawn, completion, abort, tool activity tick, turn end, `session_start` — also call `scheduleSubagentUsagePublish()`.
+- [x] Verify: orchestration must not import from `extensions/ui/footer.ts` or `extensions/ui/widget.ts`. Importing the slot constant from `extensions/ui/bus.ts` is allowed (existing pattern for `SLOT_ORCHESTRATION`).
 
 ### Autonomous check (end of phase)
 ```bash
