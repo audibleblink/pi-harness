@@ -31,7 +31,7 @@
   },
   "colors": {
     "accent":           "mauve",
-    "border":           "surface1",
+    "border":           "surface2",
     "borderAccent":     "blue",
     "borderMuted":      "lavender",
     "success":          "green",

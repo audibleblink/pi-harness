@@ -91,7 +91,10 @@ class PolishedEditor extends CustomEditor {
 	}
 
 	render(width: number): string[] {
-		const innerWidth = Math.max(1, width - 4);
+		// Reserve 1 column of unthemed margin on each side, then 2 for rails+padding.
+		const marginX = 1;
+		const frameWidth = Math.max(4, width - marginX * 2);
+		const innerWidth = Math.max(1, frameWidth - 4);
 		const rendered = super.render(innerWidth);
 		const editorInternals = this as unknown as AutocompleteEditorInternals;
 		const isShowingAutocomplete =
@@ -141,7 +144,7 @@ class PolishedEditor extends CustomEditor {
 		const coloredEditorLines = editorLines.map((l) => (textPrefix ? `${textPrefix}${l}` : l));
 		const leftRail = `${this.uiTheme.fg(railColor, "│")}${this.reset} `;
 		const rightRail = ` ${this.uiTheme.fg(borderColor, "│")}${this.reset}`;
-		const innerDashes = Math.max(0, width - 2);
+		const innerDashes = Math.max(0, frameWidth - 2);
 		const topRight = this.getTopRightLabel();
 		const topRightW = topRight ? visibleWidth(topRight) : 0;
 		let topMid: string;
@@ -181,10 +184,13 @@ class PolishedEditor extends CustomEditor {
 			? (line: string) => `${linePrefix}${line.replace(/\x1b\[0m/g, `\x1b[27m${linePrefix}`)}\x1b[0m`
 			: (line: string) => line;
 
+		const margin = " ".repeat(marginX);
+		const withMargin = (line: string) => applyBg(`${margin}${line}${margin}`);
+
 		return [
-			applyBg(top),
-			...lines.map((line) => applyBg(`${leftRail}${fillStyledLine(line, innerWidth)}${rightRail}`)),
-			applyBg(bottom),
+			withMargin(top),
+			...lines.map((line) => withMargin(`${leftRail}${fillStyledLine(line, innerWidth)}${rightRail}`)),
+			withMargin(bottom),
 			...autocompleteLines,
 		];
 	}
