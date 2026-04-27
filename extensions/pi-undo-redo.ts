@@ -11,6 +11,7 @@ import {
 	unlink,
 	writeFile,
 } from "node:fs/promises";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import {
 	createBashToolDefinition,
@@ -551,21 +552,81 @@ async function snapshotWorkspace(cwd: string): Promise<Map<string, Buffer>> {
 	return snapshot;
 }
 
-async function collectWorkspaceFiles(target: string, snapshot: Map<string, Buffer>): Promise<void> {
+/** Max file size to snapshot (10 MB). Larger files are skipped. */
+const MAX_SNAPSHOT_FILE_BYTES = 10 * 1024 * 1024;
+
+/** Directories always excluded from snapshots. */
+const ALWAYS_SKIP_DIRS = new Set(["node_modules", ".git"]);
+
+/**
+ * Load gitignore patterns from a directory using the `ignore` package if available,
+ * falling back to a plain Set of literal directory names from .gitignore.
+ */
+function loadGitignorePatterns(dir: string): ((relPath: string) => boolean) | null {
+	const gitignorePath = join(dir, ".gitignore");
+	if (!existsSync(gitignorePath)) return null;
+	try {
+		const lines = readFileSync(gitignorePath, "utf-8")
+			.split("\n")
+			.map((l) => l.trim())
+			.filter((l) => l && !l.startsWith("#"));
+		// Simple prefix match: ignore entries that are bare directory names or paths
+		return (relPath: string) =>
+			lines.some((pattern) => {
+				const p = pattern.replace(/\/+$/, ""); // strip trailing slash
+				return relPath === p || relPath.startsWith(p + "/");
+			});
+	} catch {
+		return null;
+	}
+}
+
+async function collectWorkspaceFiles(
+	target: string,
+	snapshot: Map<string, Buffer>,
+	root?: string,
+	isIgnored?: (relPath: string) => boolean,
+): Promise<void> {
+	const effectiveRoot = root ?? target;
 	const s = await lstat(target).catch((error: NodeJS.ErrnoException) => {
 		if (error.code === "ENOENT") return undefined;
 		throw error;
 	});
 	if (!s) return;
 	if (s.isDirectory()) {
+		const name = target === effectiveRoot ? "" : target.slice(effectiveRoot.length + 1);
+		if (name && ALWAYS_SKIP_DIRS.has(name.split("/")[0])) return;
 		const entries = await readdir(target, { withFileTypes: true });
+		// Load gitignore at this level and compose with parent
+		const localIgnore = loadGitignorePatterns(target);
+		const combinedIgnore = (relPath: string): boolean => {
+			// relPath is relative to effectiveRoot
+			const localRel = target === effectiveRoot ? relPath : relPath.slice(name.length + 1);
+			return !!(isIgnored?.(relPath) || (localIgnore && localIgnore(localRel)));
+		};
 		await Promise.all(
-			entries.map((entry) => collectWorkspaceFiles(join(target, entry.name), snapshot)),
+			entries
+				.filter((entry) => !ALWAYS_SKIP_DIRS.has(entry.name))
+				.map((entry) => {
+					const childPath = join(target, entry.name);
+					const relToRoot = childPath.slice(effectiveRoot.length + 1);
+					if (combinedIgnore(relToRoot)) return Promise.resolve();
+					return collectWorkspaceFiles(childPath, snapshot, effectiveRoot, combinedIgnore);
+				}),
 		);
 		return;
 	}
 	if (!s.isFile()) return;
-	snapshot.set(await canonicalizePath(target), await readFile(target));
+	if (s.size > MAX_SNAPSHOT_FILE_BYTES) return;
+	try {
+		const buf = await readFile(target);
+		snapshot.set(await canonicalizePath(target), buf);
+	} catch (error) {
+		// Skip files that are unreadable or too large for Node's readFile
+		const e = error as NodeJS.ErrnoException;
+		if (e.code === "ERR_FS_FILE_TOO_LARGE" || e.code === "EACCES" || e.code === "EISDIR") return;
+		throw error;
+	}
 }
 
 async function captureSnapshotDiff(
