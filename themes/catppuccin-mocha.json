@@ -30,8 +30,8 @@
     "crust":     "#11111b"
   },
   "colors": {
-    "accent":           "blue",
-    "border":           "blue",
+    "accent":           "pink",
+    "border":           "pink",
     "borderAccent":     "blue",
     "borderMuted":      "lavender",
     "success":          "green",
