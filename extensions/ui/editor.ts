@@ -204,7 +204,7 @@ export function registerEditor(
 			() => {
 				const mode = slots.get(SLOT_MODE) as ModeState | undefined;
 				if (!mode) return undefined;
-				const label = uiTheme.fg("syntaxKeyword", `▸ ${mode.label}`);
+				const label = uiTheme.fg("syntaxKeyword", `🤖 ${mode.label}`);
 				const model = mode.model ? uiTheme.fg("muted", ` ${mode.model}`) : "";
 				return label + model;
 			},

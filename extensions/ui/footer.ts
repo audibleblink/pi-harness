@@ -713,7 +713,7 @@ export function setupFooter(ctx: ExtensionContext, slots: Map<string, unknown>):
 					state.contextPercent !== null && state.contextPercent !== undefined
 						? state.contextPercent >= 90
 							? currentConfig.colors.contextError
-							: state.contextPercent >= 70
+							: state.contextPercent >= 40
 								? currentConfig.colors.contextWarning
 								: currentConfig.colors.contextNormal
 						: currentConfig.colors.contextNormal;
