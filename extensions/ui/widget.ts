@@ -7,6 +7,7 @@
 
 import type { OrchestrationState, AgentEntry, TaskEntry, SubagentUsageState } from "./bus.js";
 import { SPINNER, formatMs } from "../orchestration/agent-display.js";
+import { formatCount } from "./format.js";
 
 // ─── ANSI helpers ─────────────────────────────────────────────────────────────
 
@@ -33,12 +34,6 @@ function taskIcon(status: string): string {
 	if (status === "completed") return green("✓");
 	if (status === "in_progress") return yellow("⟳");
 	return dim("·");
-}
-
-function formatCount(value: number): string {
-	if (value < 1000) return `${value}`;
-	if (value < 10_000) return `${(value / 1000).toFixed(1)}k`;
-	return `${Math.round(value / 1000)}k`;
 }
 
 function taskStatusLabel(status: string): string {

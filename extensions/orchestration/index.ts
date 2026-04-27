@@ -57,19 +57,7 @@ function textResult(msg: string, details?: AgentDetails) {
   return { content: [{ type: "text" as const, text: msg }], details: details as any };
 }
 
-/** Safely read total tokens from a session. Returns 0 if unavailable. */
-function safeTotalTokens(session: { getSessionStats(): { tokens: { total: number } } } | undefined): number {
-  if (!session) return 0;
-  try { return session.getSessionStats().tokens?.total ?? 0; } catch { return 0; }
-}
-
-/** Safely read total cost from a session. Returns 0 if unavailable. */
-function safeTotalCost(session: { getSessionStats(): { cost?: number } } | undefined): number {
-  if (!session) return 0;
-  try { return session.getSessionStats().cost ?? 0; } catch { return 0; }
-}
-
-/** Safely read combined tokens+cost usage from a session. Returns zeros on failure. */
+/** session.getSessionStats() can throw mid-disposal; all readers must guard. */
 function safeUsage(session: { getSessionStats(): { tokens?: { total?: number }; cost?: number } } | undefined): { tokens: number; cost: number } {
   if (!session) return { tokens: 0, cost: 0 };
   try {
@@ -78,7 +66,6 @@ function safeUsage(session: { getSessionStats(): { tokens?: { total?: number }; 
   } catch { return { tokens: 0, cost: 0 }; }
 }
 
-/** Safe token formatting — wraps session.getSessionStats() in try-catch. */
 function safeFormatTokens(session: { getSessionStats(): { tokens: { total: number } } } | undefined): string {
   if (!session) return "";
   try { return formatTokens(session.getSessionStats().tokens.total); } catch { return ""; }
@@ -149,7 +136,7 @@ function escapeXml(s: string): string {
 function formatTaskNotification(record: AgentRecord, resultMaxLen: number): string {
   const status = getStatusLabel(record.status, record.error);
   const durationMs = record.completedAt ? record.completedAt - record.startedAt : 0;
-  const totalTokens = safeTotalTokens(record.session);
+  const totalTokens = safeUsage(record.session).tokens;
 
   const resultPreview = record.result
     ? record.result.length > resultMaxLen
@@ -193,7 +180,7 @@ function buildDetails(
 
 /** Build notification details for the custom message renderer. */
 function buildNotificationDetails(record: AgentRecord, resultMaxLen: number, activity?: AgentActivity): NotificationDetails {
-  const totalTokens = safeTotalTokens(record.session);
+  const totalTokens = safeUsage(record.session).tokens;
 
   return {
     id: record.id,
@@ -276,69 +263,50 @@ export default function (pi: ExtensionAPI) {
   // ===== ORCHESTRATION PUBLISH =====
 
   let publishTimer: ReturnType<typeof setTimeout> | undefined;
-
-  /** Session-scoped accumulator for completed subagent totals. Reset on session_start. */
-  let completedSubagentTotals: { tokens: number; cost: number } = { tokens: 0, cost: 0 };
-  /** IDs of records whose finalTokens/finalCost have already been folded into the accumulator. */
-  const accountedSubagentRecords = new Set<string>();
+  let lastSubagentUsage: SubagentUsageState | null | undefined;
 
   function flushPublish() {
     publishTimer = undefined;
     publishOrchestration(pi, buildOrchestrationState());
-    publishSubagentUsage(pi, buildSubagentUsageState());
-  }
-
-  function scheduleOrchestrationPublish() {
-    if (publishTimer) clearTimeout(publishTimer);
-    publishTimer = setTimeout(flushPublish, 50);
-  }
-
-  function scheduleSubagentUsagePublish() {
-    if (publishTimer) clearTimeout(publishTimer);
-    publishTimer = setTimeout(flushPublish, 50);
-  }
-
-  /**
-   * Build the SubagentUsageState. Performs a one-shot sweep that folds any
-   * record with stashed final stats into completedSubagentTotals exactly once
-   * (tracked via accountedSubagentRecords). This handles both foreground and
-   * background completions uniformly without relying on the onComplete callback.
-   *
-   * Returns null iff no subagent activity has occurred this session.
-   */
-  function buildSubagentUsageState(): SubagentUsageState | null {
-    // Sweep: account any terminal record with stashed finals, exactly once.
-    for (const r of manager.listAgents()) {
-      if (r.status === "running" || r.status === "queued") continue;
-      if (accountedSubagentRecords.has(r.id)) continue;
-      if (r.finalTokens === undefined && r.finalCost === undefined) continue;
-      completedSubagentTotals.tokens += r.finalTokens ?? 0;
-      completedSubagentTotals.cost += r.finalCost ?? 0;
-      accountedSubagentRecords.add(r.id);
+    const sub = buildSubagentUsageState();
+    // Suppress null→null and equal-value publishes; agent-free sessions tick events constantly.
+    if (!subagentUsageEqual(sub, lastSubagentUsage)) {
+      lastSubagentUsage = sub;
+      publishSubagentUsage(pi, sub);
     }
+  }
 
-    let liveTokens = 0;
-    let liveCost = 0;
+  function schedulePublish() {
+    if (publishTimer) clearTimeout(publishTimer);
+    publishTimer = setTimeout(flushPublish, 50);
+  }
+
+  /** Single-pass derivation: live records contribute session stats; terminal records contribute stashed finals. */
+  function buildSubagentUsageState(): SubagentUsageState | null {
+    let tokens = 0;
+    let cost = 0;
     let runningCount = 0;
-    let liveAny = false;
+    let any = false;
     for (const r of manager.listAgents()) {
-      if (r.status === "running") runningCount++;
       if (r.status === "running" || r.status === "queued") {
-        liveAny = true;
+        any = true;
+        if (r.status === "running") runningCount++;
         const u = safeUsage(r.session);
-        liveTokens += u.tokens;
-        liveCost += u.cost;
+        tokens += u.tokens;
+        cost += u.cost;
+      } else if (r.finalTokens !== undefined || r.finalCost !== undefined) {
+        any = true;
+        tokens += r.finalTokens ?? 0;
+        cost += r.finalCost ?? 0;
       }
     }
+    return any ? { tokens, cost, runningCount } : null;
+  }
 
-    if (!liveAny && completedSubagentTotals.tokens === 0 && completedSubagentTotals.cost === 0) {
-      return null;
-    }
-    return {
-      tokens: completedSubagentTotals.tokens + liveTokens,
-      cost: completedSubagentTotals.cost + liveCost,
-      runningCount,
-    };
+  function subagentUsageEqual(a: SubagentUsageState | null | undefined, b: SubagentUsageState | null | undefined): boolean {
+    if (a === b) return true;
+    if (!a || !b) return a === b;
+    return a.tokens === b.tokens && a.cost === b.cost && a.runningCount === b.runningCount;
   }
 
   function buildOrchestrationState(): OrchestrationState {
@@ -426,7 +394,7 @@ export default function (pi: ExtensionAPI) {
       const groupKey = `group:${records.map(r => r.id).join(",")}`;
       scheduleNudge(groupKey, () => {
         const unconsumed = records.filter(r => !r.resultConsumed);
-        if (unconsumed.length === 0) { scheduleOrchestrationPublish(); scheduleSubagentUsagePublish(); return; }
+        if (unconsumed.length === 0) { schedulePublish(); return; }
 
         const notifications = unconsumed.map(r => formatTaskNotification(r, 300)).join('\n\n');
         const label = partial
@@ -446,7 +414,7 @@ export default function (pi: ExtensionAPI) {
           details,
         }, { deliverAs: "followUp", triggerTurn: true });
       });
-      scheduleOrchestrationPublish(); scheduleSubagentUsagePublish();
+      schedulePublish();
     },
     30_000,
   );
@@ -558,12 +526,12 @@ export default function (pi: ExtensionAPI) {
     // ── Notification logic (from pi-subagents completion callback) ──
     if (record.resultConsumed) {
       agentActivity.delete(record.id);
-      scheduleOrchestrationPublish(); scheduleSubagentUsagePublish();
+      schedulePublish();
       return;
     }
 
     if (currentBatchAgents.some(a => a.id === record.id)) {
-      scheduleOrchestrationPublish(); scheduleSubagentUsagePublish();
+      schedulePublish();
       return;
     }
 
@@ -571,10 +539,9 @@ export default function (pi: ExtensionAPI) {
     if (result === 'pass') {
       sendIndividualNudge(record);
     }
-    scheduleOrchestrationPublish(); scheduleSubagentUsagePublish();
+    schedulePublish();
   }, undefined, (_record) => {
-    // onStart callback
-    scheduleOrchestrationPublish(); scheduleSubagentUsagePublish();
+    schedulePublish();
   });
 
   // ===== JOIN MODE =====
@@ -610,7 +577,7 @@ export default function (pi: ExtensionAPI) {
         store.clearCompleted();
         if (taskScope === "session") store.deleteFileIfEmpty();
       } else {
-        scheduleOrchestrationPublish(); scheduleSubagentUsagePublish();
+        schedulePublish();
       }
     }
   }
@@ -628,9 +595,7 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_start", async (_event, ctx) => {
     currentCtx = ctx;
     manager.clearCompleted();
-    completedSubagentTotals = { tokens: 0, cost: 0 };
-    accountedSubagentRecords.clear();
-    scheduleOrchestrationPublish(); scheduleSubagentUsagePublish();
+    schedulePublish();
   });
 
   pi.on("session_switch" as any, async (event: any, ctx: ExtensionContext) => {
@@ -650,18 +615,16 @@ export default function (pi: ExtensionAPI) {
     }
 
     manager.clearCompleted();
-    completedSubagentTotals = { tokens: 0, cost: 0 };
-    accountedSubagentRecords.clear();
     upgradeStoreIfNeeded(ctx);
     showPersistedTasks(isResume);
-    scheduleOrchestrationPublish(); scheduleSubagentUsagePublish();
+    schedulePublish();
   });
 
   pi.on("turn_start", async (_event, ctx) => {
     currentTurn++;
     currentCtx = ctx;
     upgradeStoreIfNeeded(ctx);
-    if (autoClear.onTurnStart(currentTurn)) { scheduleOrchestrationPublish(); scheduleSubagentUsagePublish(); }
+    if (autoClear.onTurnStart(currentTurn)) { schedulePublish(); }
   });
 
   pi.on("turn_end", async (event) => {
@@ -695,7 +658,7 @@ export default function (pi: ExtensionAPI) {
   pi.on("tool_execution_start", async (_event, ctx) => {
     currentCtx = ctx;
     upgradeStoreIfNeeded(ctx);
-    scheduleOrchestrationPublish(); scheduleSubagentUsagePublish();
+    schedulePublish();
   });
 
   pi.on("session_shutdown", async () => {
@@ -957,15 +920,6 @@ Guidelines:
         const existing = manager.getRecord(p.resume);
         if (!existing) return textResult(`Agent not found: "${p.resume}". It may have been cleaned up.`);
         if (!existing.session) return textResult(`Agent "${p.resume}" has no active session to resume.`);
-        // §7 resume rule: undo prior accounting before re-running so the next
-        // completion's stash isn't double-counted.
-        if (accountedSubagentRecords.has(existing.id)) {
-          completedSubagentTotals.tokens -= existing.finalTokens ?? 0;
-          completedSubagentTotals.cost -= existing.finalCost ?? 0;
-          accountedSubagentRecords.delete(existing.id);
-        }
-        existing.finalTokens = undefined;
-        existing.finalCost = undefined;
         const record = await manager.resume(p.resume, p.prompt, signal);
         if (!record) return textResult(`Failed to resume agent "${p.resume}".`);
         return textResult(
@@ -1018,7 +972,7 @@ Guidelines:
         }
 
         agentActivity.set(id, bgState);
-        scheduleOrchestrationPublish(); scheduleSubagentUsagePublish();
+        schedulePublish();
 
         const isQueued = record?.status === "queued";
         return textResult(
@@ -1100,7 +1054,7 @@ Guidelines:
       const details = buildDetails(detailBase, record, fgState, { tokens: tokenText });
       const fallbackNote = fellBack ? `Note: Unknown agent type "${rawType}" — using general-purpose.\n\n` : "";
 
-      scheduleOrchestrationPublish(); scheduleSubagentUsagePublish();
+      schedulePublish();
 
       if (record.status === "error") {
         return textResult(`${fallbackNote}Agent failed: ${record.error}`, details);
@@ -1264,7 +1218,7 @@ All tasks are created with status \`pending\`.
       const meta = p.metadata ?? {};
       if (p.agentType) meta.agentType = p.agentType;
       const task = store.create(p.subject, p.description, p.activeForm, Object.keys(meta).length > 0 ? meta : undefined);
-      scheduleOrchestrationPublish(); scheduleSubagentUsagePublish();
+      schedulePublish();
       return Promise.resolve(textResult(`Task #${task.id} created successfully: ${task.subject}`));
     },
   });
@@ -1404,7 +1358,7 @@ Status progresses: \`pending\` → \`in_progress\` → \`completed\``,
         if (fields.status === "completed") autoClear.trackCompletion(taskId, currentTurn);
       }
 
-      scheduleOrchestrationPublish(); scheduleSubagentUsagePublish();
+      schedulePublish();
       let msg = `Updated task #${taskId} ${changedFields.join(", ")}`;
       if (warnings.length > 0) msg += ` (warning: ${warnings.join("; ")})`;
       return Promise.resolve(textResult(msg));
@@ -1499,7 +1453,7 @@ Status progresses: \`pending\` → \`in_progress\` → \`completed\``,
           store.update(taskId, { status: "completed" });
           autoClear.trackCompletion(taskId, currentTurn);
           stopSubagentDirect(task.metadata.agentId);
-          scheduleOrchestrationPublish(); scheduleSubagentUsagePublish();
+          schedulePublish();
           return textResult(`Task #${taskId} stopped successfully`);
         }
         throw new Error(`No running background process for task ${taskId}`);
@@ -1507,7 +1461,7 @@ Status progresses: \`pending\` → \`in_progress\` → \`completed\``,
 
       store.update(taskId, { status: "completed" });
       autoClear.trackCompletion(taskId, currentTurn);
-      scheduleOrchestrationPublish(); scheduleSubagentUsagePublish();
+      schedulePublish();
       return textResult(`Task #${taskId} stopped successfully`);
     },
   });
@@ -1573,7 +1527,7 @@ Status progresses: \`pending\` → \`in_progress\` → \`completed\``,
         maxTurns: p.max_turns,
       };
 
-      scheduleOrchestrationPublish(); scheduleSubagentUsagePublish();
+      schedulePublish();
 
       const lines: string[] = [];
       if (launched.length > 0) {
@@ -2100,12 +2054,12 @@ ${systemPrompt}
         } else if (choice.startsWith("Clear completed")) {
           store.clearCompleted();
           if (taskScope === "session") store.deleteFileIfEmpty();
-          scheduleOrchestrationPublish(); scheduleSubagentUsagePublish();
+          schedulePublish();
           await mainMenu();
         } else if (choice.startsWith("Clear all")) {
           store.clearAll();
           if (taskScope === "session") store.deleteFileIfEmpty();
-          scheduleOrchestrationPublish(); scheduleSubagentUsagePublish();
+          schedulePublish();
           await mainMenu();
         }
       };
@@ -2151,16 +2105,16 @@ ${systemPrompt}
 
         if (action === "▸ Start (in_progress)") {
           store.update(taskId, { status: "in_progress" });
-          scheduleOrchestrationPublish(); scheduleSubagentUsagePublish();
+          schedulePublish();
           return viewTasks();
         } else if (action === "✓ Complete") {
           store.update(taskId, { status: "completed" });
           autoClear.trackCompletion(taskId, currentTurn);
-          scheduleOrchestrationPublish(); scheduleSubagentUsagePublish();
+          schedulePublish();
           return viewTasks();
         } else if (action === "✗ Delete") {
           store.update(taskId, { status: "deleted" });
-          scheduleOrchestrationPublish(); scheduleSubagentUsagePublish();
+          schedulePublish();
           return viewTasks();
         }
         return viewTasks();
@@ -2176,7 +2130,7 @@ ${systemPrompt}
         if (!description) return mainMenu();
 
         store.create(subject, description);
-        scheduleOrchestrationPublish(); scheduleSubagentUsagePublish();
+        schedulePublish();
         return mainMenu();
       };
 

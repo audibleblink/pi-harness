@@ -26,10 +26,7 @@ function finalizeOutputCleanup(record: AgentRecord): void {
   record.outputCleanup = undefined;
 }
 
-/**
- * Stash final token/cost stats from the agent's session onto the record.
- * Must be called before any session disposal. Never throws.
- */
+/** Capture totals before session disposal so post-completion readers don't lose them. Never throws. */
 function safeStashFinalStats(record: AgentRecord): void {
   if (!record.session) return;
   try {

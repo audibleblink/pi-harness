@@ -17,6 +17,7 @@ import type { AssistantMessage } from "@mariozechner/pi-ai";
 import { type ExtensionContext, getAgentDir } from "@mariozechner/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
 import { SLOT_SUBAGENT_USAGE, SLOT_UNDO, type SubagentUsageState, type UndoState } from "./bus.js";
+import { formatCount } from "./format.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -458,12 +459,6 @@ async function readRuntimeInfo(cwd: string): Promise<RuntimeInfo | undefined> {
 
 // ────────────────────────── formatting helpers ──────────────────────────
 
-function formatCount(value: number): string {
-	if (value < 1000) return `${value}`;
-	if (value < 10_000) return `${(value / 1000).toFixed(1)}k`;
-	return `${Math.round(value / 1000)}k`;
-}
-
 function formatProviderLabel(provider: string | undefined): string {
 	if (!provider) return "Unknown";
 	const known: Record<string, string> = {
@@ -493,28 +488,6 @@ function getParentUsageTotals(ctx: ExtensionContext): UsageTotals {
 		cost += message.usage?.cost?.total ?? 0;
 	}
 	return { input, output, cost };
-}
-
-function getCombinedUsageTotals(
-	ctx: ExtensionContext,
-	sub: SubagentUsageState | null,
-): {
-	parent: UsageTotals;
-	combined: UsageTotals;
-	subTokens: number;
-	subCost: number;
-} {
-	const parent = getParentUsageTotals(ctx);
-	return {
-		parent,
-		combined: {
-			input: parent.input,
-			output: parent.output,
-			cost: parent.cost + (sub?.cost ?? 0),
-		},
-		subTokens: sub?.tokens ?? 0,
-		subCost: sub?.cost ?? 0,
-	};
 }
 
 function buildTokenLabel(totals: UsageTotals): string {
@@ -732,14 +705,9 @@ export function setupFooter(ctx: ExtensionContext, slots: Map<string, unknown>):
 
 				const sub = slots.get(SLOT_SUBAGENT_USAGE) as SubagentUsageState | null | undefined;
 				const subCost = sub?.cost ?? 0;
-				let costSegment: string;
-				if (subCost > 0) {
-					const { combined } = getCombinedUsageTotals(ctx, sub ?? null);
-					const dollarStr = `$${combined.cost.toFixed(3)}`;
-					costSegment = `${theme.fg("muted", "Σ")}${colorize(theme, currentConfig.colors.cost, dollarStr)}`;
-				} else {
-					costSegment = colorize(theme, currentConfig.colors.cost, state.costLabel);
-				}
+				const costSegment = subCost > 0
+					? `${theme.fg("muted", "Σ")}${colorize(theme, currentConfig.colors.cost, `$${(getParentUsageTotals(ctx).cost + subCost).toFixed(3)}`)}`
+					: colorize(theme, currentConfig.colors.cost, state.costLabel);
 
 				const contextColor =
 					state.contextPercent !== null && state.contextPercent !== undefined
