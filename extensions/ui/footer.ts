@@ -16,7 +16,7 @@ import { promisify } from "node:util";
 import type { AssistantMessage } from "@mariozechner/pi-ai";
 import { type ExtensionContext, getAgentDir } from "@mariozechner/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
-import type { UndoState } from "./bus.js";
+import { SLOT_UNDO, type UndoState } from "./bus.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -703,8 +703,7 @@ export function setupFooter(ctx: ExtensionContext, slots: Map<string, unknown>):
 			render(width: number): string[] {
 				const innerWidth = Math.max(1, width - 2);
 
-				// Undo state comes from the UIBus slot (not extStatuses)
-				const undoState = slots.get("undo") as UndoState | undefined;
+				const undoState = slots.get(SLOT_UNDO) as UndoState | undefined;
 				const undoText = undoState
 					? theme.fg("muted", `↶${undoState.undos} ↷${undoState.redos}`)
 					: undefined;

@@ -15,13 +15,11 @@ const RESET = "\x1b[0m";
 const CYAN = "\x1b[36m";
 const GREEN = "\x1b[32m";
 const YELLOW = "\x1b[33m";
-const RED = "\x1b[31m";
 
 function dim(s: string): string { return `${DIM}${s}${RESET}`; }
 function cyan(s: string): string { return `${CYAN}${s}${RESET}`; }
 function green(s: string): string { return `${GREEN}${s}${RESET}`; }
 function yellow(s: string): string { return `${YELLOW}${s}${RESET}`; }
-function red(s: string): string { return `${RED}${s}${RESET}`; }
 
 // ─── Status icons ─────────────────────────────────────────────────────────────
 
@@ -79,10 +77,8 @@ export function hasAnimatedState(state: OrchestrationState): boolean {
 export function renderWidget(state: OrchestrationState, frame: number): string {
 	const lines: string[] = [];
 
-	// Build set of agent IDs currently active for cascade linking
 	const activeAgentIds = new Set(state.agents.map(a => a.id));
 
-	// Tasks indexed by agentId for cascade grouping
 	const tasksByAgent = new Map<string, TaskEntry[]>();
 	const orphanTasks: TaskEntry[] = [];
 	for (const task of state.tasks) {
@@ -95,7 +91,6 @@ export function renderWidget(state: OrchestrationState, frame: number): string {
 		}
 	}
 
-	// Agents section with cascade-linked tasks
 	for (const agent of state.agents) {
 		lines.push(renderAgent(agent, frame));
 		const linked = tasksByAgent.get(agent.id) ?? [];
@@ -104,7 +99,6 @@ export function renderWidget(state: OrchestrationState, frame: number): string {
 		}
 	}
 
-	// Tasks without a currently-active agent
 	for (const task of orphanTasks) {
 		lines.push(renderTask(task, false));
 	}

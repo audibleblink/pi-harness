@@ -23,7 +23,7 @@ import {
 	truncateToWidth,
 	visibleWidth,
 } from "@mariozechner/pi-tui";
-import type { ModeState } from "./bus.js";
+import { SLOT_MODE, type ModeState } from "./bus.js";
 import type { FooterHandle, ThemeLike } from "./footer.js";
 
 // ────────────────────────── helpers ──────────────────────────
@@ -88,10 +88,6 @@ class PolishedEditor extends CustomEditor {
 		this.getThinkingLevel = getThinkingLevel;
 		this.getAgentMeta = getAgentMeta;
 		this.getTopRightLabel = getTopRightLabel;
-	}
-
-	private fillLine(content: string, width: number): string {
-		return fillStyledLine(content, width);
 	}
 
 	render(width: number): string[] {
@@ -167,7 +163,7 @@ class PolishedEditor extends CustomEditor {
 
 		return [
 			top,
-			...lines.map((line) => `${leftRail}${this.fillLine(line, innerWidth)}${rightRail}`),
+			...lines.map((line) => `${leftRail}${fillStyledLine(line, innerWidth)}${rightRail}`),
 			bottom,
 			...autocompleteLines,
 		];
@@ -206,7 +202,7 @@ export function registerEditor(
 				}
 			},
 			() => {
-				const mode = slots.get("mode") as ModeState | undefined;
+				const mode = slots.get(SLOT_MODE) as ModeState | undefined;
 				if (!mode) return undefined;
 				const label = uiTheme.fg("syntaxKeyword", `▸ ${mode.label}`);
 				const model = mode.model ? uiTheme.fg("muted", ` ${mode.model}`) : "";

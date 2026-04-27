@@ -6,6 +6,7 @@
  */
 
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import { SPINNER } from "../orchestration/agent-display.js";
 
 const MESSAGES = [
 	"Hyperspace charging...",
@@ -107,14 +108,12 @@ const MESSAGES = [
 	"Galactic Empire ruling...",
 ];
 
-const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-
 function pick<T>(arr: T[]): T {
 	return arr[Math.floor(Math.random() * arr.length)]!;
 }
 
 function makeFrames(ctx: ExtensionContext): string[] {
-	return SPINNER_FRAMES.map((frame) => ctx.ui.theme.fg("dim", frame));
+	return SPINNER.map((frame) => ctx.ui.theme.fg("dim", frame));
 }
 
 export function setupWorking(pi: ExtensionAPI): void {

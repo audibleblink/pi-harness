@@ -8,7 +8,7 @@
  */
 
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { UI_BUS_TOPIC, SLOT_ORCHESTRATION, type UiBusEnvelope, type OrchestrationState } from "./bus.js";
+import { UI_BUS_TOPIC, SLOT_MODE, SLOT_ORCHESTRATION, type UiBusEnvelope, type OrchestrationState } from "./bus.js";
 import { setupFooter, type FooterHandle } from "./footer.js";
 import { registerEditor } from "./editor.js";
 import { setupWorking } from "./working.js";
@@ -50,7 +50,8 @@ export default function uiExtension(pi: ExtensionAPI) {
 			renderAndSetWidget();
 			return;
 		}
-		if (slot === "mode") {
+		if (slot === SLOT_MODE) {
+			// Mode changes only affect the editor label, not the footer.
 			editorHandle?.refresh();
 			return;
 		}
