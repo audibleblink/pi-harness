@@ -2022,6 +2022,67 @@ ${systemPrompt}
     handler: async (_args, ctx) => { await showAgentsMenu(ctx); },
   });
 
+  // ===== /USAGE COMMAND =====
+
+  pi.registerCommand("usage", {
+    description: "Show token and cost usage for parent + subagents in this session",
+    handler: async (_args: string, ctx: ExtensionCommandContext) => {
+      let pIn = 0, pOut = 0, pCost = 0;
+      for (const entry of ctx.sessionManager.getBranch()) {
+        if (entry.type !== "message" || entry.message.role !== "assistant") continue;
+        const m = entry.message as any;
+        pIn += m.usage?.input ?? 0;
+        pOut += m.usage?.output ?? 0;
+        pCost += m.usage?.cost?.total ?? 0;
+      }
+      const pTotal = pIn + pOut;
+
+      const usageCtx = ctx.getContextUsage?.();
+      const ctxWindow = ctx.model?.contextWindow ?? usageCtx?.contextWindow;
+      const ctxPct = usageCtx?.percent;
+      const ctxLine = ctxWindow
+        ? `  context: ${formatTokens(usageCtx?.tokens ?? 0)} / ${formatTokens(ctxWindow)}` +
+          (ctxPct != null ? ` (${Math.round(ctxPct)}%)` : "")
+        : "";
+
+      const lines: string[] = [];
+      lines.push("Session usage");
+      lines.push("");
+      lines.push(`Parent (${ctx.model?.name ?? ctx.model?.id ?? "?"})`);
+      lines.push(`  tokens: ↑${formatTokens(pIn)} ↓${formatTokens(pOut)}  total ${formatTokens(pTotal)}`);
+      lines.push(`  cost:   $${pCost.toFixed(4)}`);
+      if (ctxLine) lines.push(ctxLine);
+
+      const agents = manager.listAgents();
+      let sTokens = 0, sCost = 0;
+      const rows: string[] = [];
+      for (const r of agents) {
+        let t = 0, c = 0;
+        if (r.status === "running" || r.status === "queued") {
+          const u = safeUsage(r.session); t = u.tokens; c = u.cost;
+        } else {
+          t = r.finalTokens ?? 0; c = r.finalCost ?? 0;
+        }
+        sTokens += t; sCost += c;
+        rows.push(`  • ${r.id} ${getDisplayName(r.type)} [${r.status}]  ${formatTokens(t)}  $${c.toFixed(4)}  — ${r.description}`);
+      }
+
+      lines.push("");
+      if (agents.length === 0) {
+        lines.push("Subagents: none");
+      } else {
+        lines.push(`Subagents (${agents.length})`);
+        lines.push(`  tokens: ${formatTokens(sTokens)}   cost: $${sCost.toFixed(4)}`);
+        lines.push(...rows);
+      }
+
+      lines.push("");
+      lines.push(`Total: ${formatTokens(pTotal + sTokens)} tokens · $${(pCost + sCost).toFixed(4)}`);
+
+      ctx.ui.notify(lines.join("\n"), "info");
+    },
+  });
+
   // ===== /TASKS COMMAND =====
 
   pi.registerCommand("tasks", {
