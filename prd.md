@@ -1,188 +1,233 @@
-# PRD: Consolidate pi-harness extensions into UI + Orchestration
+# PRD: Surface subagent token & cost usage in the UI
 
 **Status:** Draft for execution
-**Scope:** `pi-harness/extensions/` only
-**Compat:** None. Old session entries from removed extensions are not migrated.
+**Scope:** `pi-harness/extensions/ui/` and `pi-harness/extensions/orchestration/` only
+**Compat:** None required. No persisted state, no session-format changes, no public API.
 
 ---
 
 ## 1. Problem
 
-Eight extensions in `extensions/` cooperate informally and step on each other:
+The footer's usage widget (`extensions/ui/footer.ts`) shows token totals (`↑in ↓out`) and dollar cost (`$cost`) for the **parent session only**. It walks `ctx.sessionManager.getBranch()` and sums `assistant.usage.{input,output,cost.total}` over parent assistant messages.
 
-- `zentui.ts` hardcodes status keys owned by `modes.ts` (`agent-mode-banner`) and `pi-undo-redo.ts` (`@kmiyh/pi-undo-redo/status`). A rename in either silently breaks the footer.
-- `pi-subagents` and `pi-tasks` each call `setWidget` / `setStatus` independently. Order is undefined; widgets race.
-- `pi-subagents/agent-widget.ts` and `pi-tasks/ui/task-widget.ts` each spin their own `setInterval(80)` widget tickers.
-- `pi-tasks` reaches into `pi-subagents` through three coordination channels at once: a `Symbol.for("pi-subagents:manager")` global singleton, a `pi.events`-based RPC layer (`cross-extension-rpc.ts`) with a hand-rolled protocol-version handshake, and event-name strings (`subagents:started`, `subagents:completed`, `subagents:failed`).
-- The same data is modeled twice: `agentActivity` in pi-subagents, `activeTaskIds` in pi-tasks, and `agentTaskMap` exists on both sides.
-- Widget keys, status keys, and event names are bare strings with no namespace; collisions are avoided only by convention.
+Subagents spawned via the `Agent` tool (and via `TaskExecute`) run their own `AgentSession` instances. Each carries real token consumption and real dollar cost — surfaced internally via `record.session.getSessionStats()` (returns `tokens.{input,output,cacheRead,cacheWrite,total}` and `cost`). These numbers are visible in completion notifications but **never reach the footer**, so the user has no live view of total session burn when subagents are active. With up to 4 background subagents running concurrently (`DEFAULT_MAX_CONCURRENT = 4` in `agent-manager.ts`), real-world spend can be many times the footer's number.
 
-The split between `pi-tasks` and `pi-subagents` exists for no benefit visible in the code — they were written together and only ship together in this harness.
+Additionally, once a subagent finishes its `AgentRecord` is kept for ~10 minutes (`cleanup()` in `AgentManager`) but its session is disposed almost immediately on completion in some paths, and the record itself does not persist `tokens`/`cost`. So even retroactive accounting is fragile.
 
 ## 2. Goal
 
-Two structural moves, executed together:
+The footer's `$cost` and `↑in ↓out` totals reflect **parent + all subagents (running and completed-this-session) combined**, in real time. The orchestration widget gains a single compact aggregate line `⊕ agents: <tokens> $<cost>` summarizing all active and completed-this-session subagents. No per-agent cost is shown on individual agent rows.
 
-1. **One UI owner.** A new `extensions/ui/` extension is the only place in the repo that calls `setStatus`, `setWidget`, `setFooter`, `setWorkingMessage`, `setWorkingIndicator`, or `setEditorComponent`. Other extensions publish typed-ish state to a UIBus that ui subscribes to.
-2. **One orchestration owner.** `pi-subagents/` and `pi-tasks/` collapse into a single `extensions/orchestration/` extension. The cross-extension RPC, the global Symbol singleton, the protocol-version handshake, the duplicate `agentTaskMap`, and the dual widget tickers all disappear because they have no boundary to span.
-
-`modes.ts` and `pi-undo-redo.ts` stay as separate extensions; they only change to publish via the UIBus instead of calling `setStatus` directly.
+This is achieved through a new UIBus slot — orchestration is the producer (it owns subagent state), the footer and widget are consumers. No direct cross-extension imports.
 
 ## 3. Non-goals
 
 - No changes to pi core (`@mariozechner/pi-coding-agent`).
-- No changes to `themes/`, `prompts/`, `agents/`, or top-level config.
-- `ask-user-question.ts` and `vim-quit.ts` are not touched.
-- `modes.ts` and `pi-undo-redo.ts` internals (state model, undo blob storage, mode lifecycle, etc.) are not refactored. Only the lines that publish to the TUI surface change.
-- No test suite is added. The repo has no tests today; the user has accepted manual smoke verification.
-- No backward compatibility with old session entries from `pi-subagents` or `pi-tasks`. Old sessions that contain those custom entry types may render the entry as unknown/raw or be ignored. Migration code is explicitly **not** written.
+- No changes to `modes.ts`, `pi-undo-redo.ts`, `ask-user-question.ts`, `vim-quit.ts`.
+- No new persisted files. Subagent totals are in-memory and reset on `session_start` (matches existing orchestration behavior — `clearCompleted()` is called on session start).
+- No changes to existing completion notifications, the `AgentManager` API, the `AgentRecord` shape beyond two added fields, or the `Agent`/`get_subagent_result`/`steer_subagent`/`TaskExecute` tool surfaces.
+- No per-agent cost display on individual agent rows in the widget. (Considered and rejected — see §10 Alternatives.)
+- No tooltips, no hover states, no expand/collapse interactions. The TUI doesn't have them.
+- No tests. The repo has no test suite; verification is manual smoke + `bash scripts/check-build.sh` + `bash scripts/check-invariants.sh`.
 
 ## 4. Architecture
 
-### 4.1 Final extension layout
+### 4.1 New UIBus slot
 
-```
-extensions/
-  ui/                      # NEW. Sole TUI-chrome owner. Merges zentui.ts + working-messages.ts.
-    index.ts               # Extension entry point.
-    bus.ts                 # UIBus: thin typed wrappers over pi.events. Producer-facing helpers.
-    footer.ts              # Footer composition (lifted from zentui.ts).
-    editor.ts              # Custom editor component (lifted from zentui.ts).
-    working.ts             # Working message + indicator (lifted from working-messages.ts).
-    widget.ts              # The single combined orchestration widget (agents + tasks).
-    ticker.ts              # Single 80ms ticker driving widget animation.
-  orchestration/           # NEW. Merges pi-subagents/ + pi-tasks/. Flat layout.
-    index.ts               # Extension entry point. Wires events, registers tools/commands.
-    agent-manager.ts       # (lifted from pi-subagents)
-    agent-runner.ts
-    agent-types.ts
-    custom-agents.ts
-    default-agents.ts
-    group-join.ts
-    invocation-config.ts
-    memory.ts
-    model-resolver.ts
-    output-file.ts
-    prompts.ts
-    skill-loader.ts
-    worktree.ts
-    context.ts
-    env.ts
-    types.ts
-    conversation-viewer.ts  # (lifted from pi-subagents/ui/)
-    agent-widget.ts         # DELETED. Replaced by extensions/ui/widget.ts.
-    task-store.ts          # (lifted from pi-tasks)
-    process-tracker.ts
-    auto-clear.ts
-    tasks-config.ts
-    settings-menu.ts        # (lifted from pi-tasks/ui/)
-    task-widget.ts          # DELETED. Replaced by extensions/ui/widget.ts.
-  modes.ts                 # Unchanged except: setStatus(...) calls swapped for UIBus publishMode(...).
-  pi-undo-redo.ts          # Unchanged except: setStatus(...) calls swapped for UIBus publishUndo(...).
-  ask-user-question.ts     # Untouched.
-  vim-quit.ts              # Untouched.
+A new slot is added to `extensions/ui/bus.ts`:
 
-  # DELETED:
-  zentui.ts
-  working-messages.ts
-  pi-subagents/
-  pi-tasks/
+```ts
+export const SLOT_SUBAGENT_USAGE = "subagentUsage";
+
+export interface SubagentUsageState {
+  /** Sum of tokens.total across all running + completed-this-session subagents. */
+  tokens: number;
+  /** Sum of cost across all running + completed-this-session subagents. */
+  cost: number;
+  /** Count of running subagents (not including completed). Used for aggregate line text. */
+  runningCount: number;
+}
+
+export function publishSubagentUsage(pi: ExtensionAPI, state: SubagentUsageState | null): void { ... }
 ```
 
-### 4.2 UIBus contract
+The envelope is the existing `{ slot, value }` shape on topic `harness.ui:publish`. `null` means "no subagent activity this session" — consumers should treat null/absent identically to `{tokens:0,cost:0,runningCount:0}`.
 
-Per the user's choice: **open pub/sub** transport, **owned by `extensions/ui/`**, **carried over `pi.events`**.
+Slot listing in `AGENTS.md` is updated: `mode`, `undo`, `orchestration`, `working`, **`subagentUsage`**.
 
-- `extensions/ui/bus.ts` exports producer-side helpers that wrap `pi.events.emit`. Producers import these helpers and never touch `pi.events` directly:
-  ```ts
-  // illustrative — exact names finalized during implementation
-  export function publishMode(state: ModeState | null): void;
-  export function publishUndo(state: UndoState | null): void;
-  export function publishOrchestration(state: OrchestrationState): void;
-  export function publishWorking(state: WorkingState | null): void;
-  ```
-- The transport is a single `pi.events` topic, namespaced (e.g. `harness.ui:publish`) with a `{ slot: string, value: unknown }` envelope. Open pub/sub: any future producer can publish under any string slot.
-- `extensions/ui/` is the **only subscriber**. It maintains an internal `Map<slot, value>` and re-renders footer/widget when any slot changes.
-- `null`/`undefined` value clears the slot.
-- Producers do not assume ui is loaded. If ui isn't subscribed, publishes are dropped silently — same semantics as today's `setStatus` when no consumer renders it.
-- ui must tolerate stale slots after `/reload` by clearing its slot map on `session_start` with `reason: "reload"`.
+### 4.2 Producer: `extensions/orchestration/`
 
-### 4.3 Orchestration extension
+Orchestration owns the new slot. Two sources contribute to the totals:
 
-- All in-process state lives in `extensions/orchestration/index.ts` and helper modules. **No** `Symbol.for` global, **no** RPC.
-- Single `agentTaskMap` (was duplicated). Single `agentActivity` map (unchanged from pi-subagents side).
-- `pi-tasks` was calling pi-subagents through `pi.events` RPC (`subagents:rpc:ping`, `subagents:rpc:spawn`, `subagents:rpc:stop`). After merge these become **direct function calls** to the agent manager. The RPC handlers, the protocol-version handshake, and the `subagentsAvailable` feature flag are deleted.
-- Lifecycle event names (`subagents:started`, `subagents:completed`, `subagents:failed`, `subagents:created`, `subagents:steered`, `subagents:ready`) are no longer emitted on `pi.events`. Internal coordination is direct in-process calls. Anything externally observable (e.g. notifications shown to the user) goes through the UIBus or `ctx.ui.notify` as today.
-- The two widget files (`agent-widget.ts`, `task-widget.ts`) are deleted. Orchestration computes a combined `OrchestrationState` (active agents with their per-agent metrics, active tasks, cascade hints, etc.) and publishes it via `publishOrchestration(state)`. `extensions/ui/widget.ts` renders it.
-- The two 80ms tickers are deleted. `extensions/ui/ticker.ts` runs one ticker that drives the combined widget's animation when ui has live orchestration state.
+1. **Live running agents.** For each `record` in `manager.listAgents()` with `status` ∈ {`running`, `queued`}, read `record.session?.getSessionStats()` (already wrapped by `safeTotalTokens` — extend pattern with a `safeTotalCost` and a combined `safeUsage` helper). Queued agents have no session yet → contribute 0/0.
+2. **Completed-this-session agents.** Two new fields are added to `AgentRecord` (`extensions/orchestration/types.ts`):
 
-### 4.4 modes.ts and pi-undo-redo.ts
+   ```ts
+   /** Final token total stashed at completion before session disposal. */
+   finalTokens?: number;
+   /** Final cost stashed at completion before session disposal. */
+   finalCost?: number;
+   ```
 
-Surgical change only:
+   These are populated in `AgentManager.startAgent()` inside both the `.then(...)` and `.catch(...)` branches, **before** any session disposal path. The values come from `session.getSessionStats()`. Once stashed they are immutable.
 
-- Replace each `ctx.ui.setStatus(KEY, text)` with the corresponding UIBus producer call (`publishMode(...)` / `publishUndo(...)`). Replace clearing calls (`setStatus(KEY, undefined)`) with publishing `null`.
-- Remove the now-unused status-key constants.
-- Everything else (state machines, custom message renderer in pi-undo-redo, undo blob storage, mode banner logic, pi.appendEntry calls) stays exactly as it is.
+   Completed totals are summed across **all** records in `manager.listAgents()` whose `status` is *not* in {`running`, `queued`} and which have `finalTokens`/`finalCost` populated. Records aged out by `cleanup()` (10-minute window) are removed from the map and therefore drop out of the sum — accepted; the alternative (a separate accumulator) is more state and the user accepted "session-scoped, reset on session_start" semantics.
 
-### 4.5 Working message / indicator
+   **However:** to ensure `cleanup()` does not drop totals during an active session, a separate session-scoped accumulator `completedSubagentTotals: { tokens: number; cost: number }` is maintained on the orchestration extension instance. Each completion adds to it; it is reset to `{0, 0}` on `session_start`, mirroring `manager.clearCompleted()`. This avoids relying on records that may be evicted.
 
-`working-messages.ts` is folded into `extensions/ui/working.ts`. ui calls `setWorkingMessage` / `setWorkingIndicator` directly (it owns chrome). The "pick a random working message" logic is preserved verbatim.
+   **Final rule:** the published totals = `completedSubagentTotals` + sum over `running`/`queued` records' live `getSessionStats()`.
 
-## 5. Deletion checklist (must all be true at the end)
+A new helper `buildSubagentUsageState(): SubagentUsageState | null` is added next to `buildOrchestrationState()`. It returns `null` only if `completedSubagentTotals` is `{0,0}` AND there are zero running/queued agents (i.e. the session has had no subagent activity at all).
 
-- [ ] `extensions/pi-subagents/` directory does not exist.
-- [ ] `extensions/pi-tasks/` directory does not exist.
-- [ ] `extensions/zentui.ts` does not exist.
-- [ ] `extensions/working-messages.ts` does not exist.
-- [ ] `extensions/pi-subagents/cross-extension-rpc.ts` (and its concept) is gone — no RPC over `pi.events` between extensions.
-- [ ] `Symbol.for("pi-subagents:manager")` is not referenced anywhere.
-- [ ] `agentTaskMap` exists in exactly one place.
-- [ ] `subagentsAvailable` feature-detection flag is gone.
-- [ ] Protocol-version handshake / mismatch warning is gone.
-- [ ] No code reads or writes pre-existing custom session entries from the deleted extensions (e.g. `subagents:*` customTypes from pi-subagents). Old sessions are not migrated.
+A new debounced publisher `scheduleSubagentUsagePublish()` is added, mirroring `scheduleOrchestrationPublish()` (50 ms debounce). It is called from the same call sites as `scheduleOrchestrationPublish()` — every spawn, completion, abort, tool activity tick, turn end, and `session_start`. The two publishers may share a single timer; implementation decides.
 
-## 6. Definition of done (verifiable invariants)
+### 4.3 Consumer: footer (`extensions/ui/footer.ts`)
 
-The implementing agent must verify each before declaring done:
+The setup function `setupFooter(ctx, slots)` already receives the `slots` map (used for `SLOT_UNDO`). It will additionally read `slots.get(SLOT_SUBAGENT_USAGE)` on each render.
 
-1. **No TUI chrome calls outside `extensions/ui/`.** Grep across `extensions/` (excluding `extensions/ui/`) for `setStatus(`, `setWidget(`, `setFooter(`, `setWorkingMessage(`, `setWorkingIndicator(`, `setEditorComponent(`. Zero matches.
-   - `ctx.ui.notify(...)`, `ctx.ui.confirm(...)`, `ctx.ui.select(...)`, `ctx.ui.input(...)`, `ctx.ui.editor(...)`, `ctx.ui.custom(...)`, `ctx.ui.setEditorText(...)`, `ctx.ui.setTitle(...)` are **allowed** outside ui — they are user-interaction helpers, not chrome ownership. (`setTitle` is borderline; if any extension besides ui calls it, leave it but note in the implementation plan.)
-2. **No bare-string `subagents:*` event names** anywhere in the repo. Grep `subagents:` returns zero hits in `*.ts`.
-3. **Exactly one widget animation ticker.** Grep for `setInterval(` in `extensions/` returns at most one match for the widget animation loop (in `extensions/ui/ticker.ts`). Other `setInterval` uses (cleanup intervals, debounce timers) are fine but should be reviewed and called out in the implementation plan.
-4. **`extensions/pi-subagents/` and `extensions/pi-tasks/` directories are gone.** `ls extensions/` shows neither.
-5. **Smoke scenarios pass** (manual, run by the user after implementation):
-   - **S1 — Mode banner.** Switch to a non-default mode via the modes extension. Footer shows the mode banner. Switch back. Banner clears.
-   - **S2 — Undo status.** Edit a file via the agent. Footer shows `↶N ↷M`. Trigger undo. Counters update.
-   - **S3 — Spawn a subagent.** Use the agent tool that spawns a subagent. Combined widget shows the agent with live metrics. On completion, widget clears the agent (after the existing linger window).
-   - **S4 — Task lifecycle.** Create a task, mark it in_progress, then completed. Combined widget reflects each transition.
-   - **S5 — Task spawns agent (cascade).** A task whose agent type runs an agent: widget shows both the task and its agent simultaneously, linked. Completion of the agent updates the task per existing cascade rules.
-   - **S6 — Working indicator.** During streaming, the working indicator and working message render exactly as before the refactor.
-   - **S7 — Custom editor.** zentui's polished editor component is still active (was set via `setEditorComponent`).
-   - **S8 — `/reload`.** Run `/reload`. ui resubscribes cleanly; orchestration resets in-memory state; no stale widget content remains.
+`getUsageTotals(ctx)` is renamed to `getParentUsageTotals(ctx)` (internal). A new `getCombinedUsageTotals(ctx, sub)` returns:
 
-## 7. Implementation constraints
+```ts
+{
+  parent: { input, output, cost },
+  combined: {
+    input:  parent.input,                        // tokens shown in footer remain parent-only for ↑↓
+    output: parent.output,                       // (see §5 Display rules)
+    cost:   parent.cost + (sub?.cost ?? 0),
+  },
+  subTokens: sub?.tokens ?? 0,
+  subCost:   sub?.cost ?? 0,
+}
+```
 
-- **Producer/consumer order independence.** ui may load before or after producers. Producers must not assume ui is subscribed. ui must initialize its slot map empty and accept publishes in any order.
-- **No new npm dependencies.** The bus is a thin wrapper over `pi.events`.
-- **TypeScript types are advisory but enforced.** Producer helpers are typed (`publishMode(state: ModeState | null)`); the on-the-wire envelope is open (`{ slot: string, value: unknown }`). ui validates shape narrowly per slot before rendering.
-- **Preserve current visual output.** Footer composition, widget appearance, working message text pool, custom editor rendering — all visually identical to the pre-refactor state. This is a structural refactor, not a redesign.
-- **Hot-reload (`/reload`) should keep working.** Not a hard blocker on done, but if a smoke test of `/reload` shows broken state (orphan widgets, dead subscriptions), the implementer must fix it before declaring done.
-- **Cleanup on `session_shutdown`.** Both ui and orchestration register `session_shutdown` handlers that clear timers, subscriptions, and the UIBus slot map. Order between the two extensions is irrelevant after this refactor (no shared singletons).
+The `costLabel` rendered in the footer becomes `Σ$0.245` (Greek capital sigma prefix) **whenever** `subCost > 0`. Otherwise it stays `$0.245` (no sigma) — i.e. when no subagents have run, the footer is visually identical to today.
 
-## 8. Risks
+The token label `↑in ↓out` stays parent-only. Rationale: combining input/output across parent + subagents is misleading (subagent input ≠ parent input — they have different system prompts and contexts), and the dollar figure is the actionable number. This is a deliberate scoping choice; documented in §5.
 
-| Risk | Mitigation |
+### 4.4 Consumer: widget (`extensions/ui/widget.ts`)
+
+`renderWidget(state, frame)` gets a second optional argument — the `SubagentUsageState` from the UIBus slots map. The widget owner (`extensions/ui/index.ts` or wherever `renderWidget` is invoked) passes it through.
+
+When the state is non-null AND `cost > 0`, an extra line is appended at the bottom of the widget:
+
+```
+⊕ agents: 16.3k $0.05
+```
+
+Format details:
+- `⊕` is dimmed.
+- The label `agents:` is dimmed.
+- Tokens are formatted via the existing `formatCount` helper from `footer.ts` (export it, or reimplement — implementation decides).
+- Cost is formatted as `$X.XXX` (3 decimals, matching footer convention).
+- No `(N running)` suffix. Live agent rows already show running agents individually with spinners; the count would be redundant. (Re-add later if user wants.)
+
+When `cost === 0` the line is omitted entirely (free-model rule, §5.3). When the state is `null` the line is omitted. When `cost > 0` but there are zero running agents and only completed-this-session totals, the line is still shown — that's the user's running session-spend on subagents.
+
+### 4.5 No other surfaces touched
+
+- `WorkingState`, `ModeState`, `UndoState`, `OrchestrationState` — unchanged.
+- The "Other ext statuses" 2nd footer line — unchanged.
+- The orchestration widget's per-agent rows — unchanged.
+- Completion notification XML and `<task-notification>` text — unchanged. Subagent tokens already appear there.
+
+## 5. Display rules
+
+### 5.1 Sigma prefix on footer cost
+- `subCost > 0` → render `Σ$0.245` (sigma is dimmed muted; cost color unchanged).
+- `subCost === 0` → render `$0.245` (current behavior).
+- The sigma is the **only** visual cue that the cost is summed. No tooltips exist in the TUI.
+
+### 5.2 Aggregate line in widget
+- Shown only when `cost > 0`.
+- Always at the bottom of the widget (after orphan tasks).
+- Rendered as a single dim line, no leading spinner.
+
+### 5.3 Free-model rule (Q3 = `aggregate_zero`)
+- The aggregate line is hidden when **total** subagent cost across all running + completed-this-session is `0`.
+- Per-agent rows do not show cost at all (Option C scope), so no per-row free-model check is needed.
+- Tokens accumulate normally for free models — they're real consumption — but the aggregate line is gated on cost, not tokens. If a session runs only on Ollama, the aggregate line never appears even though tokens climb. Accepted: if cost is 0 the user does not need a line about it.
+
+### 5.4 Persistence (Q4 = `memory_session`)
+- `completedSubagentTotals` is in-memory only.
+- Reset on `session_start` (same hook that calls `manager.clearCompleted()`).
+- Lost on pi restart.
+- Not written to `.pi/`.
+
+## 6. Implementation contract
+
+### 6.1 Files modified
+
+```
+extensions/ui/bus.ts           +SLOT_SUBAGENT_USAGE, +SubagentUsageState, +publishSubagentUsage
+extensions/ui/footer.ts        consume slot; rename getUsageTotals → getParentUsageTotals; add Σ prefix logic
+extensions/ui/widget.ts        renderWidget(state, frame, sub?) — append aggregate line; export or import formatCount
+extensions/ui/index.ts         pass SLOT_SUBAGENT_USAGE value into renderWidget calls
+extensions/orchestration/types.ts        +finalTokens, +finalCost on AgentRecord
+extensions/orchestration/agent-manager.ts  stash final stats in .then/.catch before any disposal
+extensions/orchestration/index.ts          +completedSubagentTotals, +buildSubagentUsageState, +scheduleSubagentUsagePublish, reset on session_start, call publish at all existing scheduleOrchestrationPublish sites
+AGENTS.md                       update slot list to include subagentUsage
+```
+
+No other files in the repo are touched.
+
+### 6.2 Invariants to preserve
+
+- TUI chrome calls (`setStatus`, `setWidget`, `setFooter`, `setWorkingMessage`, `setWorkingIndicator`, `setEditorComponent`) remain only inside `extensions/ui/`. New code in orchestration must not call them. (`bash scripts/check-invariants.sh` enforces this.)
+- All cross-extension state moves through the UIBus envelope `{ slot, value }` on topic `harness.ui:publish`. Orchestration never imports footer/widget directly.
+- `bash scripts/check-build.sh` passes (TypeScript strict, no emit).
+
+### 6.3 New tech / dependencies
+
+**None.** Everything uses existing primitives: `pi.events.emit`, the `slots` map already wired in `extensions/ui/index.ts`, the existing 50 ms debounce pattern, `session.getSessionStats()` already in pi-coding-agent's public API.
+
+## 7. Edge cases
+
+| Case | Behavior |
 |---|---|
-| Visual regressions in the footer (zentui's composition is intricate). | Lift `footer.ts` from zentui as a near-verbatim copy; only swap input source from hardcoded status keys to UIBus slot map. |
-| Subtle ordering bugs in orchestration after merging two event streams (was: pi-tasks listens to pi-subagents events). | Replace event listening with direct function calls. The merge eliminates the asynchrony, not just papers over it. |
-| Old sessions containing pi-subagents/pi-tasks custom session entries throw on load. | The deleted extensions' `pi.appendEntry` customTypes are no longer registered. pi core ignores unknown customTypes — verify on first run with an old session. If pi core crashes on unknown customTypes (it doesn't, per docs), that is the user's choice per "don't care on compat". |
-| `setInterval` audit (DoD #3) is fuzzy because cleanup intervals exist. | The implementation plan must list every remaining `setInterval` and what it drives, so the reviewer can confirm only one is for widget animation. |
+| Subagent crashes before session created (queued → error) | `finalTokens`/`finalCost` remain `undefined`; not added to `completedSubagentTotals`. Live sum sees status≠running, contributes 0. Net: 0 contribution, correct. |
+| Subagent aborted via `manager.abort()` | `.catch` branch stashes `getSessionStats()` if `record.session` exists, else 0/0. |
+| Subagent runs on a free model (cost = 0) | Tokens accumulate; cost stays 0. Aggregate line hidden (5.3). Footer shows `$0.000` without sigma. |
+| Worktree cleanup runs after agent | Stats stashed before `cleanupWorktree` call → unaffected. |
+| Resume of a completed agent (`AgentManager.resume`) | Resume reuses the existing session; on completion the new totals overwrite the old ones. To avoid double-counting, on resume start: subtract the existing `finalTokens`/`finalCost` from `completedSubagentTotals` (move record back to "active" accounting), then re-stash on completion. |
+| `cleanup()` evicts a completed record after 10 min | Already debited into `completedSubagentTotals`; eviction does not re-debit. Correct. |
+| `manager.clearCompleted()` called on session_start | `completedSubagentTotals` is reset to `{0,0}` in the same call site. Both must reset together. |
+| Slot value is `null` (no subagent activity ever) | Footer renders today's exact UI (no sigma). Widget omits aggregate line. |
+| Session has subagents that all finished + 0 currently running | Aggregate line still shows totals (cost > 0). Footer keeps sigma. |
 
-## 9. Out-of-scope decisions deferred to implementation plan
+## 8. Acceptance criteria
 
-- Exact UIBus slot names (`mode` vs `modes`, `undo` vs `undo-redo`, etc.).
-- Exact module split inside `extensions/ui/` (the layout above is illustrative).
-- Whether the combined widget shows agents-above-tasks or interleaved.
-- Whether `OrchestrationState` is a single fat object or one publish per sub-slot. Default: single object, publish on any change.
+A reviewer can verify each by running pi against this repo and observing the TUI:
 
-These are tactical and the executing agent decides them when writing the plan or the code, with the constraint that they don't change the externally observable behavior captured in §6.
+1. **Baseline preserved.** With no subagents spawned, the footer's right side is byte-identical to current behavior. No `Σ`, no aggregate widget line.
+2. **Live update.** Spawn one background agent (`Agent` tool, run_in_background: true). Within ~100 ms of the agent's first turn, the footer cost gains a `Σ` prefix and the orchestration widget grows an `⊕ agents: <tokens> $<cost>` line. Both update on every tool activity tick.
+3. **Multi-agent aggregation.** Spawn 3 background agents. The aggregate line shows the sum of all 3 sessions' tokens and cost. Footer cost = parent cost + sum of all 3.
+4. **Persistence after completion.** All 3 agents finish. Per-agent rows disappear from the widget. The aggregate line remains, showing the final summed totals. Footer still shows `Σ$<combined>`.
+5. **Session reset.** Trigger `session_start` (e.g. `/new`). Aggregate line disappears. Footer cost drops the sigma. `completedSubagentTotals` is `{0,0}`.
+6. **Free model.** Run a subagent on Ollama. Tokens accumulate internally but the aggregate line never appears (cost = 0). Footer cost stays without sigma.
+7. **Resume path.** Spawn agent, let it complete, resume it via `get_subagent_result`-then-`steer`-equivalent, let it complete again. Aggregate cost reflects only the *current* final stats of that agent — not double-counted.
+8. **Build clean.** `bash scripts/check-build.sh` exits 0.
+9. **Invariants clean.** `bash scripts/check-invariants.sh` exits 0. New `setStatus`/`setWidget`/etc. calls do not appear outside `extensions/ui/`.
+
+## 9. Risks
+
+- **Cost field on `SessionStats` is a number, not a structured object.** Confirmed in `pi-coding-agent/dist/core/agent-session.d.ts:129–146`. Direct sum is safe.
+- **`session.getSessionStats()` may throw if called after dispose.** Already wrapped by `safeTotalTokens` pattern; new helpers must use the same try/catch pattern.
+- **Resume double-count.** Mitigated by the documented subtract-before-rerun rule (§7). Implementation must handle this; missing it leaks money over resumes.
+- **Race between completion stash and cleanup eviction.** Eliminated by using a separate accumulator that does not depend on record retention.
+- **Sigma character (Σ, U+03A3) rendering.** Standard Greek; renders fine in every monospace font shipped with mainstream terminals. Falls back to box if not — acceptable, the cost number is still readable.
+
+## 10. Alternatives considered
+
+- **Per-agent cost on each widget row** (Option B from brainstorm). Rejected by user (Q5 = `aggregate`). Wider rows on already-busy spinner lines, redundant with aggregate.
+- **Footer-only display, no widget line** (purer Option C). Rejected as too hidden — the orchestration widget is where users look during active work.
+- **Persisted totals across restarts** (Q4 alternatives). Rejected; matches "in-memory, session-scoped" answer.
+- **`Σ` prefix everywhere vs. only when subCost > 0.** Conditional chosen so a no-subagent session's footer is byte-identical to today.
+- **Combined `↑↓` tokens in footer.** Rejected — input/output across parent and subagents are different prompt contexts; summing is misleading. Cost is the actionable scalar.
+
+## 11. Out of scope (future work, not this PRD)
+
+- A `/usage` slash command that prints a per-agent breakdown.
+- Cost color thresholds (e.g. red at $1.00, yellow at $0.50).
+- Persisting cumulative session cost to `.pi/` for retrospective analysis.
+- Per-model cost rollups (e.g. "this session: $0.18 sonnet, $0.06 haiku").
+- Surface `cacheRead`/`cacheWrite` tokens.
