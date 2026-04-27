@@ -18,6 +18,7 @@ import { renderWidget, hasAnimatedState } from "./widget.js";
 export default function uiExtension(pi: ExtensionAPI) {
 	const slots = new Map<string, unknown>();
 	let handle: FooterHandle | undefined;
+	let editorHandle: { refresh: () => void } | undefined;
 	let unsubscribeBus: (() => void) | undefined;
 	let currentCtx: ExtensionContext | undefined;
 	let frame = 0;
@@ -49,6 +50,10 @@ export default function uiExtension(pi: ExtensionAPI) {
 			renderAndSetWidget();
 			return;
 		}
+		if (slot === "mode") {
+			editorHandle?.refresh();
+			return;
+		}
 		handle?.refresh();
 	}
 
@@ -76,7 +81,7 @@ export default function uiExtension(pi: ExtensionAPI) {
 		}
 		currentCtx = ctx;
 		handle = setupFooter(ctx, slots);
-		registerEditor(ctx, pi, handle, slots);
+		editorHandle = registerEditor(ctx, pi, handle, slots);
 		handle.scheduleProjectRefresh(ctx);
 		handle.refresh();
 	});

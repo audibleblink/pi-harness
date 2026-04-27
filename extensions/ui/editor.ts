@@ -181,7 +181,7 @@ export function registerEditor(
 	pi: ExtensionAPI,
 	handle: FooterHandle,
 	slots: Map<string, unknown>,
-): void {
+): { refresh: () => void } {
 	patchUserMessageComponent();
 
 	let autocompleteFixed = false;
@@ -230,5 +230,14 @@ export function registerEditor(
 		return editor;
 	};
 
-	ctx.ui.setEditorComponent(editorFactory);
+	let requestEditorRender: (() => void) | undefined;
+
+	const wrappedFactory = (tui: TUI, theme: EditorTheme, keybindings: KeybindingsManager) => {
+		requestEditorRender = () => tui.requestRender();
+		const editor = editorFactory(tui, theme, keybindings);
+		return editor;
+	};
+
+	ctx.ui.setEditorComponent(wrappedFactory);
+	return { refresh: () => requestEditorRender?.() };
 }
