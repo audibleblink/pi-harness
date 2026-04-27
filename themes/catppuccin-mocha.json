@@ -51,6 +51,7 @@
     "toolPendingBg":    "surface0",
     "toolSuccessBg":    "base",
     "toolErrorBg":      "#2e1e1e",
+    "editorBg":         "base",
     "toolTitle":        "mauve",
     "toolOutput":       "",
 

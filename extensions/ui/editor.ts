@@ -161,10 +161,30 @@ class PolishedEditor extends CustomEditor {
 		const bottom = this.uiTheme.fg(borderColor, "╰") + this.uiTheme.fg(borderColor, "─".repeat(innerDashes)) + this.uiTheme.fg(borderColor, "╯");
 		const lines = ["", ...coloredEditorLines, "", metaLine];
 
+		// Optional textarea background via custom "editorBg" theme token.
+		// Pi's loader stores unknown keys in the fg map, so we resolve the fg
+		// escape and swap 38; -> 48; to produce a background sequence. We also
+		// pin an explicit foreground ("text") so the cursor's inverse-video
+		// marker swaps to a visible text-colored block instead of revealing the
+		// terminal default background.
+		let editorBgAnsi = "";
+		try {
+			const fgEscape = this.uiTheme.getFgAnsi("editorBg" as Parameters<Theme["getFgAnsi"]>[0]);
+			editorBgAnsi = fgEscape.replace(/\x1b\[38;/, "\x1b[48;");
+		} catch {
+			/* theme doesn't define editorBg — leave background untouched */
+		}
+		const linePrefix = editorBgAnsi ? `${editorBgAnsi}${this.uiTheme.getFgAnsi("text")}` : "";
+		// Rewrite hard resets so they don't kill our bg/fg state, and ensure
+		// inverse-video (cursor marker) is explicitly disabled with \x1b[27m.
+		const applyBg = linePrefix
+			? (line: string) => `${linePrefix}${line.replace(/\x1b\[0m/g, `\x1b[27m${linePrefix}`)}\x1b[0m`
+			: (line: string) => line;
+
 		return [
-			top,
-			...lines.map((line) => `${leftRail}${fillStyledLine(line, innerWidth)}${rightRail}`),
-			bottom,
+			applyBg(top),
+			...lines.map((line) => applyBg(`${leftRail}${fillStyledLine(line, innerWidth)}${rightRail}`)),
+			applyBg(bottom),
 			...autocompleteLines,
 		];
 	}
