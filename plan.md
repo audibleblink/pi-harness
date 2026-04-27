@@ -20,11 +20,11 @@ A third loop, `bash scripts/smoke.sh`, is referenced by the project but only use
 Add the new slot constant, type, and publisher to `extensions/ui/bus.ts`. No producer or consumer wiring yet — this phase only establishes the shared contract so subsequent phases can import a stable name. The slot is unused at end of phase, which is fine.
 
 ### Tasks
-- [ ] Read `extensions/ui/bus.ts` and identify the existing slot pattern (`SLOT_MODE`, `SLOT_UNDO`, `SLOT_ORCHESTRATION`, `SLOT_WORKING`) and `publish*` helper shape.
-- [ ] Add `export const SLOT_SUBAGENT_USAGE = "subagentUsage"` next to the existing slot constants.
-- [ ] Add `export interface SubagentUsageState { tokens: number; cost: number; runningCount: number }`.
-- [ ] Add `export function publishSubagentUsage(pi: ExtensionAPI, state: SubagentUsageState | null): void` that emits `harness.ui:publish` with envelope `{ slot: SLOT_SUBAGENT_USAGE, value: state }`, mirroring the existing publish helpers exactly.
-- [ ] Update `AGENTS.md` slot list to read `mode`, `undo`, `orchestration`, `working`, `subagentUsage`.
+- [x] Read `extensions/ui/bus.ts` and identify the existing slot pattern (`SLOT_MODE`, `SLOT_UNDO`, `SLOT_ORCHESTRATION`, `SLOT_WORKING`) and `publish*` helper shape.
+- [x] Add `export const SLOT_SUBAGENT_USAGE = "subagentUsage"` next to the existing slot constants.
+- [x] Add `export interface SubagentUsageState { tokens: number; cost: number; runningCount: number }`.
+- [x] Add `export function publishSubagentUsage(pi: ExtensionAPI, state: SubagentUsageState | null): void` that emits `harness.ui:publish` with envelope `{ slot: SLOT_SUBAGENT_USAGE, value: state }`, mirroring the existing publish helpers exactly.
+- [x] Update `AGENTS.md` slot list to read `mode`, `undo`, `orchestration`, `working`, `subagentUsage`.
 
 ### Autonomous check (end of phase)
 ```bash

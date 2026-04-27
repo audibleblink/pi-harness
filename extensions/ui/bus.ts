@@ -18,6 +18,7 @@ export const SLOT_MODE = "mode";
 export const SLOT_UNDO = "undo";
 export const SLOT_ORCHESTRATION = "orchestration";
 export const SLOT_WORKING = "working";
+export const SLOT_SUBAGENT_USAGE = "subagentUsage";
 
 // ─── Envelope ─────────────────────────────────────────────────────────────────
 
@@ -63,6 +64,12 @@ export interface WorkingState {
 	message: string;
 }
 
+export interface SubagentUsageState {
+	tokens: number;
+	cost: number;
+	runningCount: number;
+}
+
 // ─── Producers ────────────────────────────────────────────────────────────────
 
 export function publishMode(pi: ExtensionAPI, state: ModeState | null): void {
@@ -79,4 +86,8 @@ export function publishOrchestration(pi: ExtensionAPI, state: OrchestrationState
 
 export function publishWorking(pi: ExtensionAPI, state: WorkingState | null): void {
 	pi.events.emit(UI_BUS_TOPIC, { slot: SLOT_WORKING, value: state } satisfies UiBusEnvelope);
+}
+
+export function publishSubagentUsage(pi: ExtensionAPI, state: SubagentUsageState | null): void {
+	pi.events.emit(UI_BUS_TOPIC, { slot: SLOT_SUBAGENT_USAGE, value: state } satisfies UiBusEnvelope);
 }

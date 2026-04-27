@@ -47,7 +47,7 @@ tsconfig.json     # TypeScript config for extensions/ (noEmit, strict)
 - Run `bash scripts/check-build.sh` to type-check after editing.
 - Run `bash scripts/check-invariants.sh` to verify structural invariants (TUI chrome ownership, no stale event names, etc).
 - All TUI chrome calls (`setStatus`, `setWidget`, `setFooter`, `setWorkingMessage`, `setWorkingIndicator`, `setEditorComponent`) must live exclusively in `extensions/ui/`. Other extensions publish state via the UIBus (`extensions/ui/bus.ts`).
-- The UIBus topic is `harness.ui:publish` with envelope `{ slot: string, value: unknown }`. Slot names: `mode`, `undo`, `orchestration`, `working`.
+- The UIBus topic is `harness.ui:publish` with envelope `{ slot: string, value: unknown }`. Slot names: `mode`, `undo`, `orchestration`, `working`, `subagentUsage`.
 
 ## No test suite
 
