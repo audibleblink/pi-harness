@@ -140,7 +140,7 @@ class PolishedEditor extends CustomEditor {
 		const textPrefix = isBashMode ? this.uiTheme.getFgAnsi("mdCode") : "";
 		const coloredEditorLines = editorLines.map((l) => (textPrefix ? `${textPrefix}${l}` : l));
 		const leftRail = `${this.uiTheme.fg(railColor, "│")}${this.reset} `;
-		const rightRail = ` ${this.uiTheme.fg(railColor, "│")}${this.reset}`;
+		const rightRail = ` ${this.uiTheme.fg(borderColor, "│")}${this.reset}`;
 		const innerDashes = Math.max(0, width - 2);
 		const topRight = this.getTopRightLabel();
 		const topRightW = topRight ? visibleWidth(topRight) : 0;
@@ -157,8 +157,8 @@ class PolishedEditor extends CustomEditor {
 		} else {
 			topMid = this.uiTheme.fg(borderColor, "─".repeat(innerDashes));
 		}
-		const top = this.uiTheme.fg(railColor, "╭") + topMid + this.uiTheme.fg(railColor, "╮");
-		const bottom = this.uiTheme.fg(railColor, "╰") + this.uiTheme.fg(borderColor, "─".repeat(innerDashes)) + this.uiTheme.fg(railColor, "╯");
+		const top = this.uiTheme.fg(borderColor, "╭") + topMid + this.uiTheme.fg(borderColor, "╮");
+		const bottom = this.uiTheme.fg(borderColor, "╰") + this.uiTheme.fg(borderColor, "─".repeat(innerDashes)) + this.uiTheme.fg(borderColor, "╯");
 		const lines = ["", ...coloredEditorLines, "", metaLine];
 
 		return [
