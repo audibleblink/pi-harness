@@ -45,13 +45,13 @@ All five commands must succeed (exit 0 / grep matches). End state: contract pres
 This phase modifies only `extensions/orchestration/types.ts` and `extensions/orchestration/agent-manager.ts` to capture a subagent's final tokens/cost into `AgentRecord` at completion (success and failure paths), **before** any session disposal. No publishing yet — values are captured but unused.
 
 ### Tasks
-- [ ] Add to `AgentRecord` in `extensions/orchestration/types.ts`:
+- [x] Add to `AgentRecord` in `extensions/orchestration/types.ts`:
   - `finalTokens?: number`
   - `finalCost?: number`
-- [ ] In `extensions/orchestration/agent-manager.ts`, locate `startAgent()` and the `.then(...)` / `.catch(...)` branches (and any equivalent completion paths used by `resume()`).
-- [ ] Add a small local helper `safeStashFinalStats(record)` that calls `record.session?.getSessionStats()` inside try/catch (mirroring the existing `safeTotalTokens` pattern) and writes `record.finalTokens` and `record.finalCost`. Missing/failed stats → leave fields `undefined`. Never throw out.
-- [ ] Invoke `safeStashFinalStats(record)` in both `.then` and `.catch` **before** any worktree cleanup, session disposal, or notification dispatch. Verify by reading the surrounding code that no disposal occurs earlier.
-- [ ] Confirm `manager.resume()` flow re-uses the same `.then/.catch`; if it has its own completion handler, stash there too.
+- [x] In `extensions/orchestration/agent-manager.ts`, locate `startAgent()` and the `.then(...)` / `.catch(...)` branches (and any equivalent completion paths used by `resume()`).
+- [x] Add a small local helper `safeStashFinalStats(record)` that calls `record.session?.getSessionStats()` inside try/catch (mirroring the existing `safeTotalTokens` pattern) and writes `record.finalTokens` and `record.finalCost`. Missing/failed stats → leave fields `undefined`. Never throw out.
+- [x] Invoke `safeStashFinalStats(record)` in both `.then` and `.catch` **before** any worktree cleanup, session disposal, or notification dispatch. Verify by reading the surrounding code that no disposal occurs earlier.
+- [x] Confirm `manager.resume()` flow re-uses the same `.then/.catch`; if it has its own completion handler, stash there too.
 
 ### Autonomous check (end of phase)
 ```bash

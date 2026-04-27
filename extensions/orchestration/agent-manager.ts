@@ -26,6 +26,19 @@ function finalizeOutputCleanup(record: AgentRecord): void {
   record.outputCleanup = undefined;
 }
 
+/**
+ * Stash final token/cost stats from the agent's session onto the record.
+ * Must be called before any session disposal. Never throws.
+ */
+function safeStashFinalStats(record: AgentRecord): void {
+  if (!record.session) return;
+  try {
+    const stats = record.session.getSessionStats();
+    record.finalTokens = stats.tokens?.total ?? 0;
+    record.finalCost = stats.cost ?? 0;
+  } catch { /* leave fields undefined */ }
+}
+
 /** Default max concurrent background agents. */
 const DEFAULT_MAX_CONCURRENT = 4;
 
@@ -182,6 +195,7 @@ export class AgentManager {
         record.result = responseText;
         record.session = session;
         record.completedAt ??= Date.now();
+        safeStashFinalStats(record);
         finalizeOutputCleanup(record);
 
         if (record.worktree) {
@@ -203,6 +217,7 @@ export class AgentManager {
         }
         record.error = errorMessage(err);
         record.completedAt ??= Date.now();
+        safeStashFinalStats(record);
         finalizeOutputCleanup(record);
 
         if (record.worktree) {
@@ -273,10 +288,12 @@ export class AgentManager {
       record.status = "completed";
       record.result = responseText;
       record.completedAt = Date.now();
+      safeStashFinalStats(record);
     } catch (err) {
       record.status = "error";
       record.error = errorMessage(err);
       record.completedAt = Date.now();
+      safeStashFinalStats(record);
     }
 
     return record;

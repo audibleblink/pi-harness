@@ -85,6 +85,10 @@ export interface AgentRecord {
   outputFile?: string;
   /** Cleanup function for the output file stream subscription. */
   outputCleanup?: () => void;
+  /** Final token total stashed at completion before session disposal. */
+  finalTokens?: number;
+  /** Final cost stashed at completion before session disposal. */
+  finalCost?: number;
 }
 
 /** Details attached to custom notification messages for visual rendering. */
