@@ -737,7 +737,7 @@ export default function (pi: ExtensionAPI) {
       ...defaultDescs,
       ...(customDescs.length > 0 ? ["", "Custom agents:", ...customDescs] : []),
       "",
-      "Custom agents can be defined in .pi/agents/<name>.md (project) or $PI_CODING_AGENT_DIR/agents/<name>.md (personal, defaults to $XDG_CONFIG_HOME/pi/agent/agents, i.e. ~/.config/pi/agent/agents) — picked up automatically. Project-level agents override personal ones. Creating a .md file with the same name as a default agent overrides it. The legacy path ~/.pi/agent/agents is still read for backward compatibility.",
+      "Custom agents defined in .pi/agents/<name>.md (project) or $PI_CODING_AGENT_DIR/agents/<name>.md",
     ].join("\n");
   };
 
@@ -753,24 +753,22 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool<any, AgentDetails>({
     name: "Agent",
     label: "Agent",
-    description: `Launch a sub-agent to handle a task autonomously. Each agent type has its own tools and capabilities.
+    description: `Launch a sub-agent to handle a task autonomously. Each agent type has its own contenxt, tools ,and capabilities.
 
 Available agent types:
 ${typeListText}
 
-- Foreground calls run sequentially (one at a time). For parallel work, use run_in_background: true on each agent and notifications will arrive on completion.
-- Provide a clear, detailed prompt — the agent cannot ask follow-up questions.
-- Results are returned as text; summarize them for the user.
-- Use resume to continue a previous agent, steer_subagent to send mid-run messages to a running one.`,
+- For parallel work, use run_in_background: true on each agent.
+- Results are returned as text; summarize them for the user. `,
     parameters: Type.Object({
-      prompt: Type.String({ description: "The task for the agent to perform." }),
+      prompt: Type.String({ description: "The clear, detailed prompt/task for the agent to perform. The agent cannot ask follow-up questions." }),
       description: Type.String({ description: "A short (3-5 word) description of the task (shown in UI)." }),
       subagent_type: Type.String({ description: `The type of specialized agent to use. Available types: ${getAvailableTypes().join(", ")}.` }),
       model: Type.Optional(Type.String({ description: 'Optional model override. Accepts "provider/modelId" or fuzzy name.' })),
       thinking: Type.Optional(Type.String({ description: "Thinking level: off, minimal, low, medium, high, xhigh." })),
       max_turns: Type.Optional(Type.Number({ description: "Maximum number of agentic turns before stopping.", minimum: 1 })),
-      run_in_background: Type.Optional(Type.Boolean({ description: "Set to true to run in background. Returns agent ID immediately." })),
-      resume: Type.Optional(Type.String({ description: "Optional agent ID to resume from." })),
+      run_in_background: Type.Optional(Type.Boolean({ description: "Set to true to run in background. Returns agent ID immediately. notifications will arrive on completion" })),
+      resume: Type.Optional(Type.String({ description: "Optional agent ID to resume from or steer_subagent to send mid-run messages to a running one." })),
       isolated: Type.Optional(Type.Boolean({ description: "If true, agent gets no extension/MCP tools." })),
       inherit_context: Type.Optional(Type.Boolean({ description: "If true, fork parent conversation into the agent." })),
       isolation: Type.Optional(Type.Literal("worktree", { description: 'Set to "worktree" to run in an isolated git worktree.' })),
