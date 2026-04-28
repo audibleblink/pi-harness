@@ -27,7 +27,8 @@
     "surface0":  "#313244",
     "base":      "#1e1e2e",
     "mantle":    "#181825",
-    "crust":     "#11111b"
+    "crust":     "#11111b",
+    "background": "#24273a"
   },
   "colors": {
     "accent":           "mauve",
@@ -50,8 +51,8 @@
     "customMessageLabel": "mauve",
     "toolPendingBg":    "surface0",
     "toolSuccessBg":    "base",
-    "toolErrorBg":      "#2e1e1e",
-    "editorBg":         "base",
+    "toolErrorBg":      "maroon",
+    "editorBg":         "background",
     "toolTitle":        "mauve",
     "toolOutput":       "",
 
@@ -90,8 +91,8 @@
     "bashMode":         "peach"
   },
   "export": {
-    "pageBg":  "#11111b",
-    "cardBg":  "#181825",
-    "infoBg":  "#313244"
+    "pageBg":  "crust",
+    "cardBg":  "mantle",
+    "infoBg":  "surface0"
   }
 }
