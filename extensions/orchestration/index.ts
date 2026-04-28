@@ -753,27 +753,15 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool<any, AgentDetails>({
     name: "Agent",
     label: "Agent",
-    description: `Launch a new agent to handle complex, multi-step tasks autonomously.
-
-The Agent tool launches specialized agents that autonomously handle complex tasks. Each agent type has specific capabilities and tools available to it.
+    description: `Launch a sub-agent to handle a task autonomously. Each agent type has its own tools and capabilities.
 
 Available agent types:
 ${typeListText}
 
-Guidelines:
-- For parallel work, use run_in_background: true on each agent. Foreground calls run sequentially — only one executes at a time.
-- Use Explore for codebase searches and code understanding.
-- Use Plan for architecture and implementation planning.
-- Use general-purpose for complex tasks that need file editing.
-- Provide clear, detailed prompts so the agent can work autonomously.
-- Agent results are returned as text — summarize them for the user.
-- Use run_in_background for work you don't need immediately. You will be notified when it completes.
-- Use resume with an agent ID to continue a previous agent's work.
-- Use steer_subagent to send mid-run messages to a running background agent.
-- Use model to specify a different model (as "provider/modelId", or fuzzy e.g. "haiku", "sonnet").
-- Use thinking to control extended thinking level.
-- Use inherit_context if the agent needs the parent conversation history.
-- Use isolation: "worktree" to run the agent in an isolated git worktree (safe parallel file modifications).`,
+- Foreground calls run sequentially (one at a time). For parallel work, use run_in_background: true on each agent and notifications will arrive on completion.
+- Provide a clear, detailed prompt — the agent cannot ask follow-up questions.
+- Results are returned as text; summarize them for the user.
+- Use resume to continue a previous agent, steer_subagent to send mid-run messages to a running one.`,
     parameters: Type.Object({
       prompt: Type.String({ description: "The task for the agent to perform." }),
       description: Type.String({ description: "A short (3-5 word) description of the task (shown in UI)." }),
@@ -1160,45 +1148,11 @@ Guidelines:
   pi.registerTool({
     name: "TaskCreate",
     label: "TaskCreate",
-    description: `Use this tool to create a structured task list for your current coding session. This helps you track progress, organize complex tasks, and demonstrate thoroughness to the user.
-It also helps the user understand the progress of the task and overall progress of their requests.
+    description: `Create a task in the session task list. Use for multi-step work (3+ distinct steps) or when the user provides a list of things to do. Skip for trivial, single-step, or purely conversational/informational requests.
 
-## When to Use This Tool
+Mark a task in_progress before starting it and completed only when fully done. After completing a task, check TaskList for newly unblocked work.
 
-Use this tool proactively in these scenarios:
-
-- Complex multi-step tasks - When a task requires 3 or more distinct steps or actions
-- Non-trivial and complex tasks - Tasks that require careful planning or multiple operations
-- Plan mode - When using plan mode, create a task list to track the work
-- User explicitly requests todo list - When the user directly asks you to use the todo list
-- User provides multiple tasks - When users provide a list of things to be done (numbered or comma-separated)
-- After receiving new instructions - Immediately capture user requirements as tasks
-- When you start working on a task - Mark it as in_progress BEFORE beginning work
-- After completing a task - Mark it as completed and add any new follow-up tasks discovered during implementation
-
-## When NOT to Use This Tool
-
-Skip using this tool when:
-- There is only a single, straightforward task
-- The task is trivial and tracking it provides no organizational benefit
-- The task can be completed in less than 3 trivial steps
-- The task is purely conversational or informational
-
-## Task Fields
-
-- **subject**: A brief, actionable title in imperative form (e.g., "Fix authentication bug in login flow")
-- **description**: Detailed description of what needs to be done, including context and acceptance criteria
-- **activeForm** (optional): Present continuous form shown in the spinner when the task is in_progress (e.g., "Fixing authentication bug"). If omitted, the spinner shows the subject instead.
-
-All tasks are created with status \`pending\`.
-
-## Tips
-
-- Create tasks with clear, specific subjects that describe the outcome
-- Include enough detail in the description for another agent to understand and complete the task
-- After creating tasks, use TaskUpdate to set up dependencies (blocks/blockedBy) if needed
-- Check TaskList first to avoid creating duplicate tasks
-- Include \`agentType\` (e.g., "general-purpose", "Explore") to mark tasks for subagent execution via TaskExecute`,
+Tasks are created with status \`pending\`. Set \`agentType\` to mark a task for subagent execution via TaskExecute. Use TaskUpdate afterward to add blocks/blockedBy dependencies.`,
     promptGuidelines: [
       "When working on complex multi-step tasks, use TaskCreate to track progress and TaskUpdate to update status.",
       "Mark tasks as in_progress before starting work and completed when done.",
@@ -1226,19 +1180,7 @@ All tasks are created with status \`pending\`.
   pi.registerTool({
     name: "TaskList",
     label: "TaskList",
-    description: `Use this tool to list all tasks in the task list.
-
-## When to Use This Tool
-
-- To see what tasks are available to work on (status: 'pending', no owner, not blocked)
-- To check overall progress on the project
-- To find tasks that are blocked and need dependencies resolved
-- After completing a task, to check for newly unblocked work or claim the next available task
-- **Prefer working on tasks in ID order** (lowest ID first) when multiple tasks are available
-
-## Output
-
-Returns a summary of each task including id, subject, status, owner, and blockedBy.`,
+    description: `List all tasks. Returns id, subject, status, owner, and blockedBy for each. Prefer working on tasks in ID order (lowest first).`,
     parameters: Type.Object({}),
 
     execute(_toolCallId, _params, _signal, _onUpdate, _ctx) {
@@ -1308,24 +1250,7 @@ Returns a summary of each task including id, subject, status, owner, and blocked
   pi.registerTool({
     name: "TaskUpdate",
     label: "TaskUpdate",
-    description: `Use this tool to update a task in the task list.
-
-## When to Use This Tool
-
-**Before starting work on a task:**
-- Mark it in_progress BEFORE beginning — do not start work without updating status first
-
-**Mark tasks as resolved:**
-- When you have completed the work described in a task
-- IMPORTANT: Always mark your assigned tasks as resolved when you finish them
-- ONLY mark a task as completed when you have FULLY accomplished it
-
-**Delete tasks:**
-- Setting status to \`deleted\` permanently removes the task
-
-## Status Workflow
-
-Status progresses: \`pending\` → \`in_progress\` → \`completed\``,
+    description: `Update a task's fields or status. Mark in_progress before starting work, completed only when fully done. Status \`deleted\` removes the task permanently.`,
     parameters: Type.Object({
       taskId: Type.String({ description: "The ID of the task to update" }),
       status: Type.Optional(Type.Unsafe<"pending" | "in_progress" | "completed" | "deleted">({
