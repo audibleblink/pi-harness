@@ -1,6 +1,5 @@
 ---
 description: Implement the feature
-agent: build
 ---
 
 Implement the feature
@@ -14,23 +13,17 @@ Implement the feature
    Read the files:
    - $ARGUMENTS
 
-2. **Show current progress**
-
-   Display:
-   - Progress: "N/M phase/tasks complete"
-   - Remaining phase/tasks overview
-
-3. **Implement the next phase**
+2. **Implement the next phase**
  
    Choose only the next unfinished phase. 
 
-   - Create a dependency graph from the phase definitions in the execution plan
-   - Delegate each phase of independent work to a subtask using the @general subagent
+   - Create a dependency graph from the phase definitions in the execution plan. Use Task* tools to build and execute
+   - Delegate each phase of independent work to a Task using TaskExecute (sub Agent)
    - Commit each phase on completion within the same subtask
 
    For each pending task:
    - Show which task is being worked on
-   - Make the code changes required
+   - Make the code changes required using TDD
    - Keep changes minimal and focused
    - Validate functionality and correctness
    - Mark task complete in the tasks file: `- [ ]` → `- [x]`
@@ -39,7 +32,7 @@ Implement the feature
    **Exit if:**
    - Phase Complete
 
-4. **On completion or pause, show status**
+3. **On completion or pause, show status**
 
    Display:
    - Tasks completed this session
@@ -65,7 +58,7 @@ Delegating phase 4/7: <task description>
 - Always read context files before starting
 - If implementation reveals issues, pause and suggest artifact updates
 - Keep code changes minimal and scoped to each task
-- Update task checkbox immediately after completing each task
-- Each phase is implemented in as a subtask
+- Update task checkbox in the plan immediately after completing each task
+- Each phase is implemented in as subtasks
 - Commit at the end of each phase task
 - Once started, do not stop until all phases are complete

@@ -1,12 +1,11 @@
 ---
 description: Plan bugfixes or feature requests.
-agent: plan
 ---
 
 # Initial ask
 
 User states they need to create or modify some code
-Use available tools and knowledge of the code to come up with several scenarios
+Use available tools and knowledge of the code to brainstorm several scenarios
 
 ## User Ask
 
@@ -20,5 +19,4 @@ $ARGUMENTS
 - [ ] Answer questions the user may have 
 
 # Finally
-Once the user has selected an option, with possible revisions, summarize the final decisions as a 
-single line of text so it may be passed to other tools. 
+Once the user has selected an option, with possible revisions, summarize the final decision

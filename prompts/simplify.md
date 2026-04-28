@@ -1,3 +1,7 @@
+---
+description: Request code simplification
+---
+
 # Simplify: Code Review and Cleanup
 
 Review all changed files for reuse, quality, and efficiency. Fix any issues found.
