@@ -13,7 +13,8 @@ This repo is a **pi package** — it is not a standalone application. It is load
         "+extensions/pi-undo-redo.ts",
         "+extensions/vim-quit.ts",
         "+extensions/ui/index.ts",
-        "+extensions/orchestration/index.ts"
+        "+extensions/orchestration/index.ts",
+        "+extensions/stealth-skills.ts"
       ]
     }
   ]
@@ -34,6 +35,7 @@ extensions/       # TypeScript pi extensions (loaded by pi at startup)
   pi-undo-redo.ts # Undo/redo for file edits
   ask-user-question.ts
   vim-quit.ts
+  stealth-skills.ts # Hide skills from system prompt while keeping /skill:name (config: stealthSkills in settings.json, /skills to toggle)
 agents/           # Custom agent type definitions (.md files)
 prompts/          # Prompt templates injected into sessions
 themes/           # UI color themes
