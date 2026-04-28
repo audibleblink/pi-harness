@@ -81,6 +81,7 @@ export default function uiExtension(pi: ExtensionAPI) {
 			frame = 0;
 			slots.clear();
 		}
+		handle?.dispose();
 		currentCtx = ctx;
 		handle = setupFooter(ctx, slots);
 		editorHandle = registerEditor(ctx, pi, handle, slots);
@@ -124,6 +125,9 @@ export default function uiExtension(pi: ExtensionAPI) {
 
 	pi.on("session_shutdown", async () => {
 		ticker.stop();
+		handle?.dispose();
+		handle = undefined;
+		currentCtx = undefined;
 		unsubscribeBus?.();
 		unsubscribeBus = undefined;
 	});

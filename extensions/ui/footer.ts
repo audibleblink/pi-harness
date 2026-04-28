@@ -474,24 +474,30 @@ function formatProviderLabel(provider: string | undefined): string {
 	);
 }
 
-type UsageTotals = { input: number; output: number; cost: number };
+type UsageTotals = { input: number; output: number; cacheRead: number; cacheWrite: number; cost: number };
 
 function getParentUsageTotals(ctx: ExtensionContext): UsageTotals {
 	let input = 0;
 	let output = 0;
+	let cacheRead = 0;
+	let cacheWrite = 0;
 	let cost = 0;
 	for (const entry of ctx.sessionManager.getBranch()) {
 		if (entry.type !== "message" || entry.message.role !== "assistant") continue;
 		const message = entry.message as AssistantMessage;
 		input += message.usage?.input ?? 0;
 		output += message.usage?.output ?? 0;
+		cacheRead += message.usage?.cacheRead ?? 0;
+		cacheWrite += message.usage?.cacheWrite ?? 0;
 		cost += message.usage?.cost?.total ?? 0;
 	}
-	return { input, output, cost };
+	return { input, output, cacheRead, cacheWrite, cost };
 }
 
 function buildTokenLabel(totals: UsageTotals): string {
-	return `↑${formatCount(totals.input)} ↓${formatCount(totals.output)}`;
+	const cached = totals.cacheRead + totals.cacheWrite;
+	const cacheSegment = cached > 0 ? ` +${formatCount(cached)}⚡` : "";
+	return `↑${formatCount(totals.input)}${cacheSegment} ↓${formatCount(totals.output)}`;
 }
 
 function buildCostLabel(totals: UsageTotals): string {
@@ -565,6 +571,7 @@ export interface FooterHandle {
 	getModelLabel(): string;
 	getProviderLabel(): string;
 	buildCwdGitSegment(theme: ThemeLike): string;
+	dispose(): void;
 }
 
 // ────────────────────────── setup ──────────────────────────
@@ -625,6 +632,7 @@ export function setupFooter(ctx: ExtensionContext, slots: Map<string, unknown>):
 	let projectRefreshPending = false;
 	let projectRefreshDebounceTimer: NodeJS.Timeout | undefined;
 	let lastProjectRefreshAt = 0;
+	let disposed = false;
 	const PROJECT_REFRESH_MIN_INTERVAL_MS = 500;
 
 	const refresh = () => requestFooterRender?.();
@@ -652,10 +660,12 @@ export function setupFooter(ctx: ExtensionContext, slots: Map<string, unknown>):
 	};
 
 	const runProjectRefresh = (ctx: ExtensionContext) => {
+		if (disposed) return;
 		projectRefreshInFlight = true;
 		lastProjectRefreshAt = Date.now();
 		void refreshProjectState(ctx).finally(() => {
 			projectRefreshInFlight = false;
+			if (disposed) return;
 			refresh();
 			if (projectRefreshPending) {
 				projectRefreshPending = false;
@@ -665,6 +675,7 @@ export function setupFooter(ctx: ExtensionContext, slots: Map<string, unknown>):
 	};
 
 	const scheduleProjectRefresh = (ctx: ExtensionContext) => {
+		if (disposed) return;
 		if (projectRefreshInFlight) {
 			projectRefreshPending = true;
 			return;
@@ -679,6 +690,15 @@ export function setupFooter(ctx: ExtensionContext, slots: Map<string, unknown>):
 			projectRefreshDebounceTimer = undefined;
 			runProjectRefresh(ctx);
 		}, PROJECT_REFRESH_MIN_INTERVAL_MS - elapsed);
+	};
+
+	const dispose = () => {
+		disposed = true;
+		projectRefreshPending = false;
+		if (projectRefreshDebounceTimer) {
+			clearTimeout(projectRefreshDebounceTimer);
+			projectRefreshDebounceTimer = undefined;
+		}
 	};
 
 	ctx.ui.setFooter((tui, theme, footerData) => {
@@ -766,5 +786,6 @@ export function setupFooter(ctx: ExtensionContext, slots: Map<string, unknown>):
 		getModelLabel: () => state.modelLabel,
 		getProviderLabel: () => state.providerLabel,
 		buildCwdGitSegment,
+		dispose,
 	};
 }
