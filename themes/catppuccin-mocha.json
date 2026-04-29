@@ -51,7 +51,7 @@
 		"customMessageLabel": "mauve",
 		"toolPendingBg": "surface0",
 		"toolSuccessBg": "base",
-		"toolErrorBg": "maroon",
+		"toolErrorBg": "#a02009",
 		"editorBg": "background",
 		"toolTitle": "mauve",
 		"toolOutput": "",
