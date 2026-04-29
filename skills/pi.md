@@ -1,3 +1,8 @@
+---
+name: pi
+description: agent harness docs for pi. invoke when user asks to modify 'itself', 'pi {extensions,skills,themes,prompts}'
+---
+
 Pi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):
 - Main documentation: /Users/auf000h/.local/share/mise/installs/node/24.7.0/lib/node_modules/@mariozechner/pi-coding-agent/README.md
 - Additional docs: /Users/auf000h/.local/share/mise/installs/node/24.7.0/lib/node_modules/@mariozechner/pi-coding-agent/docs
