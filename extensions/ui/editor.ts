@@ -23,9 +23,8 @@ import {
 	truncateToWidth,
 	visibleWidth,
 } from "@mariozechner/pi-tui";
-import { SLOT_MODE, type ModeState } from "./bus.js";
+import { SLOT_GHOST, SLOT_MODE, type GhostController, type ModeState } from "./bus.js";
 import type { FooterHandle, ThemeLike } from "./footer.js";
-import { createGhostController, type GhostController } from "./ghost-completion.js";
 
 // ────────────────────────── helpers ──────────────────────────
 
@@ -243,7 +242,7 @@ export function registerEditor(
 
 	let autocompleteFixed = false;
 	const uiTheme = ctx.ui.theme;
-	const ghost = createGhostController(pi, ctx);
+	const ghost = slots.get(SLOT_GHOST) as GhostController | undefined;
 
 	const editorFactory = (tui: TUI, theme: EditorTheme, keybindings: KeybindingsManager) => {
 		const editor = new PolishedEditor(
@@ -293,7 +292,7 @@ export function registerEditor(
 
 	const wrappedFactory = (tui: TUI, theme: EditorTheme, keybindings: KeybindingsManager) => {
 		requestEditorRender = () => tui.requestRender();
-		ghost.attachTui(() => tui.requestRender());
+		ghost?.attachTui(() => tui.requestRender());
 		const editor = editorFactory(tui, theme, keybindings);
 		return editor;
 	};

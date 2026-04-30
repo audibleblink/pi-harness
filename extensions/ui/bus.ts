@@ -19,6 +19,7 @@ export const SLOT_UNDO = "undo";
 export const SLOT_ORCHESTRATION = "orchestration";
 export const SLOT_WORKING = "working";
 export const SLOT_SUBAGENT_USAGE = "subagentUsage";
+export const SLOT_GHOST = "ghost";
 
 // ─── Envelope ─────────────────────────────────────────────────────────────────
 
@@ -70,6 +71,13 @@ export interface SubagentUsageState {
 	runningCount: number;
 }
 
+export interface GhostController {
+	getSuggestion(): string;
+	onTextChanged(text: string): void;
+	tryAccept(text: string): string | null;
+	attachTui(requestRender: () => void): void;
+}
+
 // ─── Producers ────────────────────────────────────────────────────────────────
 
 export function publishMode(pi: ExtensionAPI, state: ModeState | null): void {
@@ -90,4 +98,8 @@ export function publishWorking(pi: ExtensionAPI, state: WorkingState | null): vo
 
 export function publishSubagentUsage(pi: ExtensionAPI, state: SubagentUsageState | null): void {
 	pi.events.emit(UI_BUS_TOPIC, { slot: SLOT_SUBAGENT_USAGE, value: state } satisfies UiBusEnvelope);
+}
+
+export function publishGhost(pi: ExtensionAPI, controller: GhostController | null): void {
+	pi.events.emit(UI_BUS_TOPIC, { slot: SLOT_GHOST, value: controller } satisfies UiBusEnvelope);
 }

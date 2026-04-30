@@ -1,31 +1,27 @@
 /**
- * Ghost-text completion controller for the PolishedEditor.
+ * Ghost-text completion extension.
  *
  * When the editor is empty and idle, calls claude-haiku-4-5 to predict the
  * next user message based on the conversation transcript on the current
- * branch. The prediction is exposed via `getSuggestion()` so the editor can
- * render it as dim ghost text. Tab on an empty editor accepts.
+ * branch. The prediction is published on the UIBus as SLOT_GHOST; the editor
+ * in extensions/ui/ consumes it to render dim ghost text and accept on Tab.
+ *
+ * MUST be loaded before extensions/ui/index.ts so that the controller is
+ * available on the bus when the editor is registered during session_start.
  */
 
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { complete } from "@mariozechner/pi-ai";
+import { type GhostController, publishGhost } from "./ui/bus.js";
 
 const DEBOUNCE_MS = 400;
 const MAX_TURNS = 3;
 const MAX_MESSAGE_CHARS = 1500;
 
-export interface GhostController {
-	getSuggestion(): string;
-	onTextChanged(text: string): void;
-	tryAccept(text: string): string | null;
-	attachTui(requestRender: () => void): void;
-}
-
 function buildTranscript(ctx: ExtensionContext): string {
 	const branch = ctx.sessionManager.getBranch();
 	const parts: string[] = [];
 	let userTurns = 0;
-	// Walk newest -> oldest, collecting user/assistant text. Stop after MAX_TURNS user msgs.
 	for (let i = branch.length - 1; i >= 0; i--) {
 		const m: any = (branch[i] as any).message;
 		if (!m) continue;
@@ -49,7 +45,7 @@ function buildTranscript(ctx: ExtensionContext): string {
 	return parts.join("\n\n");
 }
 
-export function createGhostController(pi: ExtensionAPI, ctx: ExtensionContext): GhostController {
+function createGhostController(pi: ExtensionAPI, ctx: ExtensionContext): GhostController {
 	let suggestion = "";
 	let abort: AbortController | undefined;
 	let debounceTimer: ReturnType<typeof setTimeout> | undefined;
@@ -96,7 +92,7 @@ export function createGhostController(pi: ExtensionAPI, ctx: ExtensionContext): 
 								{
 									type: "text",
 									text:
-										`Given this conversation transcript between a USER and an ASSISTANT, predict the single next message the USER is most likely to send. Output ONLY that next message text — no quotes, no preamble, no explanation. Keep it concise (1-2 sentences max). If you cannot make a sensible prediction, output an empty response.\n\n<transcript>\n${transcript}\n</transcript>\n\nNext USER message:`,
+										`You are generating ghost text for the USER's empty input box in a chat with an assistant. The text must be what the USER might type next, never something the ASSISTANT would say or continue with. Given the transcript, predict the single next USER message. Output ONLY that USER message text — no role label, quotes, preamble, or explanation. Keep it concise (1-2 sentences max). If there is no sensible USER follow-up, output an empty response.\n\n<transcript>\n${transcript}\n</transcript>\n\nText for the USER input box:`,
 								},
 							],
 							timestamp: Date.now(),
@@ -111,8 +107,9 @@ export function createGhostController(pi: ExtensionAPI, ctx: ExtensionContext): 
 				.map((c: any) => c.text)
 				.join("")
 				.trim()
-				.replace(/^["'`]|["'`]$/g, "");
-			if (!text) return;
+				.replace(/^["'`]|["'`]$/g, "")
+				.replace(/^USER:\s*/i, "");
+			if (!text || /^ASSISTANT:\s*/i.test(text)) return;
 			suggestion = text.split("\n")[0]!;
 			requestRender?.();
 		} catch {
@@ -165,8 +162,17 @@ export function createGhostController(pi: ExtensionAPI, ctx: ExtensionContext): 
 		},
 		attachTui(rr) {
 			requestRender = rr;
-			// Initial empty state — kick off a fetch.
 			scheduleFetch();
 		},
 	};
+}
+
+export default function ghostCompletionExtension(pi: ExtensionAPI) {
+	pi.on("session_start", async (_event, ctx) => {
+		const controller = createGhostController(pi, ctx);
+		publishGhost(pi, controller);
+	});
+	pi.on("session_shutdown", () => {
+		publishGhost(pi, null);
+	});
 }
