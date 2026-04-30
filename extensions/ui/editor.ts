@@ -25,6 +25,7 @@ import {
 } from "@mariozechner/pi-tui";
 import { SLOT_MODE, type ModeState } from "./bus.js";
 import type { FooterHandle, ThemeLike } from "./footer.js";
+import { createGhostController, type GhostController } from "./ghost-completion.js";
 
 // ────────────────────────── helpers ──────────────────────────
 
@@ -69,6 +70,7 @@ class PolishedEditor extends CustomEditor {
 	private readonly getAgentMeta: () => string | undefined;
 	private readonly getTopRightLabel: () => string | undefined;
 	private readonly uiTheme: Theme;
+	private readonly ghost?: GhostController;
 	private readonly reset = "\x1b[0m";
 
 	constructor(
@@ -80,6 +82,7 @@ class PolishedEditor extends CustomEditor {
 		getThinkingLevel: () => string | undefined,
 		getAgentMeta: () => string | undefined,
 		getTopRightLabel: () => string | undefined,
+		ghost?: GhostController,
 	) {
 		super(tui, theme, keybindings, { paddingX: 0 });
 		this.borderColor = (text: string) => uiTheme.fg("border", text);
@@ -88,6 +91,22 @@ class PolishedEditor extends CustomEditor {
 		this.getThinkingLevel = getThinkingLevel;
 		this.getAgentMeta = getAgentMeta;
 		this.getTopRightLabel = getTopRightLabel;
+		this.ghost = ghost;
+	}
+
+	handleInput(data: string): void {
+		if (this.ghost && data === "\t") {
+			const accepted = this.ghost.tryAccept(this.getText());
+			if (accepted !== null) {
+				this.setText(accepted);
+				this.ghost.onTextChanged(accepted);
+				return;
+			}
+		}
+		const before = this.getText();
+		super.handleInput(data);
+		const after = this.getText();
+		if (this.ghost && after !== before) this.ghost.onTextChanged(after);
 	}
 
 	render(width: number): string[] {
@@ -141,7 +160,23 @@ class PolishedEditor extends CustomEditor {
 		const railColor = isBashMode ? "mdCode" : "accent";
 		const borderColor = isBashMode ? "mdCode" : "border";
 		const textPrefix = isBashMode ? this.uiTheme.getFgAnsi("mdCode") : "";
-		const coloredEditorLines = editorLines.map((l) => (textPrefix ? `${textPrefix}${l}` : l));
+		let coloredEditorLines = editorLines.map((l) => (textPrefix ? `${textPrefix}${l}` : l));
+
+		// Inject ghost-text suggestion after the cursor when editor is empty.
+		const ghostText = this.ghost && this.getText().length === 0 ? this.ghost.getSuggestion() : "";
+		if (ghostText) {
+			const dim = `\x1b[2m${this.uiTheme.fg("muted", ghostText)}\x1b[22m`;
+			for (let i = 0; i < coloredEditorLines.length; i++) {
+				const line = coloredEditorLines[i]!;
+				const idx = line.indexOf("\x1b[7m");
+				if (idx === -1) continue;
+				const close = line.indexOf("\x1b[0m", idx);
+				if (close === -1) continue;
+				const insertAt = close + 4;
+				coloredEditorLines[i] = line.slice(0, insertAt) + dim + line.slice(insertAt);
+				break;
+			}
+		}
 		const leftRail = `${this.uiTheme.fg(railColor, "│")}${this.reset} `;
 		const rightRail = ` ${this.uiTheme.fg(borderColor, "│")}${this.reset}`;
 		const innerDashes = Math.max(0, frameWidth - 2);
@@ -208,6 +243,7 @@ export function registerEditor(
 
 	let autocompleteFixed = false;
 	const uiTheme = ctx.ui.theme;
+	const ghost = createGhostController(pi, ctx);
 
 	const editorFactory = (tui: TUI, theme: EditorTheme, keybindings: KeybindingsManager) => {
 		const editor = new PolishedEditor(
@@ -235,6 +271,7 @@ export function registerEditor(
 				return label + model;
 			},
 			() => handle.buildCwdGitSegment(uiTheme as unknown as ThemeLike),
+			ghost,
 		);
 
 		const originalHandleInput = editor.handleInput.bind(editor);
@@ -256,6 +293,7 @@ export function registerEditor(
 
 	const wrappedFactory = (tui: TUI, theme: EditorTheme, keybindings: KeybindingsManager) => {
 		requestEditorRender = () => tui.requestRender();
+		ghost.attachTui(() => tui.requestRender());
 		const editor = editorFactory(tui, theme, keybindings);
 		return editor;
 	};
