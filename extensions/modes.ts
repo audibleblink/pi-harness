@@ -52,6 +52,7 @@ interface AgentDefinition {
 	description?: string;
 	model?: string;
 	tools?: string[];
+	promptMode?: "replace" | "prepend";
 	body: string;
 }
 
@@ -152,11 +153,14 @@ function parseAgentFile(filePath: string): AgentDefinition | undefined {
 		? fm["name"]
 		: basename(filePath, ".md");
 
+	const promptMode = fm["prompt_mode"] === "replace" ? "replace" : "prepend";
+
 	return {
 		name,
 		description: typeof fm["description"] === "string" ? fm["description"] : undefined,
 		model: typeof fm["model"] === "string" ? fm["model"] : undefined,
 		tools,
+		promptMode,
 		body: body.trim(),
 	};
 }
@@ -419,9 +423,10 @@ export default function agentModeExtension(pi: ExtensionAPI) {
 
 	pi.on("before_agent_start", async (event) => {
 		if (activeAgent?.body) {
-			return {
-				systemPrompt: `${activeAgent.body}\n\n${event.systemPrompt}`,
-			};
+			const systemPrompt = activeAgent.promptMode === "replace"
+				? activeAgent.body
+				: `${activeAgent.body}\n\n${event.systemPrompt}`;
+			return { systemPrompt };
 		}
 	});
 
@@ -439,8 +444,8 @@ export default function agentModeExtension(pi: ExtensionAPI) {
 			return;
 		}
 
-		// On resume/fork, restore from session state (name only — no re-apply of model/tools)
-		if (event.reason === "resume" || event.reason === "fork") {
+		// On resume/fork/new, restore from session state (name only — no re-apply of model/tools)
+		if (event.reason === "resume" || event.reason === "fork" || event.reason === "new") {
 			const entries = ctx.sessionManager.getEntries();
 			const agentEntry = entries
 				.filter((e: { type: string; customType?: string }) => e.type === "custom" && e.customType === AGENT_STATE_ENTRY_TYPE)
