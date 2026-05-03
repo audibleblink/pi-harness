@@ -1,8 +1,35 @@
 import { spawnSync } from "node:child_process";
-import { readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { type ExtensionAPI, getAgentDir } from "@mariozechner/pi-coding-agent";
+
+/**
+ * Read the user's stealth-skills list and strip those <skill>...</skill> entries
+ * from the system prompt's <available_skills> block. The stealth-skills extension
+ * only modifies the prompt during before_agent_start; viewers invoked before any
+ * turn (or that re-read state) would otherwise show the unfiltered base prompt.
+ */
+function getStealthedSystemPrompt(ctx: { getSystemPrompt(): string }): string {
+	const prompt = ctx.getSystemPrompt();
+	let stealth: string[];
+	try {
+		const path = join(getAgentDir(), "settings.json");
+		if (!existsSync(path)) return prompt;
+		const settings = JSON.parse(readFileSync(path, "utf-8")) as { stealthSkills?: unknown };
+		stealth = Array.isArray(settings.stealthSkills)
+			? settings.stealthSkills.filter((s): s is string => typeof s === "string")
+			: [];
+	} catch {
+		return prompt;
+	}
+	if (stealth.length === 0) return prompt;
+	const names = new Set(stealth);
+	return prompt.replace(
+		/  <skill>\s*<name>([^<]+)<\/name>[\s\S]*?<\/skill>\n?/g,
+		(match, name: string) => (names.has(name) ? "" : match),
+	);
+}
 
 type ContentBlock =
 	| { type: "text"; text?: string }
@@ -23,8 +50,11 @@ type ContentBlock =
 type NotifyLevel = "info" | "warning" | "error";
 type EditorContext = { ui: { notify(message: string, level: NotifyLevel): void } };
 
-const ENTER_EDITOR_SCREEN = "\x1b[?25h\x1b[?1049l";
-const LEAVE_EDITOR_SCREEN = "\x1b[?1049h\x1b[?25l";
+// Pi's TUI renders inline on the main screen (no alt buffer). The editor (vim/etc.)
+// manages its own alt-screen entry/exit. We only show the cursor for the editor and
+// hide it again on return; we must not touch ?1049 here or tmux scrollback breaks.
+const SHOW_CURSOR = "\x1b[?25h";
+const HIDE_CURSOR = "\x1b[?25l";
 const TOOL_RESPONSE_ROLES = new Set(["toolResult", "tool_result", "toolResponse", "tool_response"]);
 
 export default function sessionMarkdownEditor(pi: ExtensionAPI) {
@@ -61,9 +91,16 @@ export default function sessionMarkdownEditor(pi: ExtensionAPI) {
 					return;
 				}
 
+				// Carry forward the active agent so mode survives the session swap.
+				const agentEntry = ctx.sessionManager
+					.getEntries()
+					.filter((e: any) => e.type === "custom" && e.customType === "agent-state")
+					.pop() as { data?: { name: string } } | undefined;
+
 				const result = await ctx.newSession({
 					parentSession,
 					setup: async (sm) => {
+						if (agentEntry?.data?.name) sm.appendCustomEntry("agent-state", { name: agentEntry.data.name });
 						for (const message of messages) sm.appendMessage(toAgentMessage(message));
 					},
 					withSession: async (ctx) => {
@@ -104,7 +141,7 @@ function openInEditor(file: string, ctx: EditorContext): boolean {
 
 	const wasRaw = process.stdin.isTTY && process.stdin.isRaw;
 	if (wasRaw) process.stdin.setRawMode(false);
-	process.stdout.write(ENTER_EDITOR_SCREEN);
+	process.stdout.write(SHOW_CURSOR);
 	try {
 		const [command, ...args] = editor.split(/\s+/).filter(Boolean);
 		const result = spawnSync(command, [...args, file], {
@@ -121,7 +158,7 @@ function openInEditor(file: string, ctx: EditorContext): boolean {
 			return false;
 		}
 	} finally {
-		process.stdout.write(LEAVE_EDITOR_SCREEN);
+		process.stdout.write(HIDE_CURSOR);
 		if (wasRaw) process.stdin.setRawMode(true);
 	}
 	return true;
@@ -131,7 +168,7 @@ function renderSessionMarkdown(ctx: any, pi: ExtensionAPI): string {
 	const sm = ctx.sessionManager;
 	const branch = sm.getBranch();
 	const tools = pi.getAllTools();
-	const systemPrompt = ctx.getSystemPrompt();
+	const systemPrompt = getStealthedSystemPrompt(ctx);
 	const lines: string[] = [];
 
 	lines.push("# Pi Session", "");
@@ -171,7 +208,7 @@ function renderSessionYaml(ctx: any, pi: ExtensionAPI): string {
 			leafId: sm.getLeafId() ?? null,
 			model: ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : null,
 		},
-		systemPrompt: ctx.getSystemPrompt(),
+		systemPrompt: getStealthedSystemPrompt(ctx),
 		tools: pi.getAllTools().map((tool) => ({
 			name: tool.name,
 			description: tool.description,
