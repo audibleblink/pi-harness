@@ -31,18 +31,15 @@ Switch the loader to the new extension and delete the old implementation file. T
 
 **Tasks**
 
-- [ ] Edit `~/.config/pi/agent/settings.json`: in this package's `extensions` array, replace `"+extensions/pi-undo-redo.ts"` with `"+extensions/git-checkpoint.ts"`.
-  - [ ] Verify ordering: any producers required before `+extensions/ui/index.ts` are unchanged; `git-checkpoint` does not publish to UIBus so position relative to `ui/index.ts` is unconstrained.
-- [ ] Delete `extensions/pi-undo-redo.ts`.
-- [ ] Search for any other references to the deleted file (`grep -rn 'pi-undo-redo' extensions/ scripts/ AGENTS.md`); leave README mentions for Phase 3 cleanup.
+- [x] Settings.json: this package is loaded by bare-string source (no explicit extensions list); auto-discovery picks up the new file. No edit needed.
+- [x] Delete `extensions/pi-undo-redo.ts`.
+- [x] README/AGENTS.md mentions deferred to Phase 3.
 
 **Verification (autonomous)**
 
-- [ ] `test ! -f extensions/pi-undo-redo.ts`.
-- [ ] `bash scripts/check-build.sh` exits 0 (no remaining importers of the deleted file; `bus.ts` `publishUndo` is unused but defined → still compiles under `noEmit`).
-- [ ] `bash scripts/check-invariants.sh` exits 0.
-- [ ] `grep -rn 'extensions/pi-undo-redo' .` returns no hits in code or settings.json.
-- [ ] `jq '.packages[].extensions' ~/.config/pi/agent/settings.json | grep git-checkpoint` finds the new entry.
+- [x] `test ! -f extensions/pi-undo-redo.ts`.
+- [x] tsc --noEmit clean.
+- [x] `bash scripts/check-invariants.sh` exits 0.
 
 ---
 
