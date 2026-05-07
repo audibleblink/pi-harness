@@ -72,4 +72,4 @@ Load order in settings.json matters: producers that publish on `session_start` (
 
 ## No test suite
 
-The repo has no automated tests. Verification is via TypeScript build check + grep invariants + manual smoke scenarios defined in `prd.md` §6.
+The repo has no automated tests. Verification is via TypeScript build check + grep invariants + manual smoke scenarios
