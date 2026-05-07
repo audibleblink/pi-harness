@@ -49,21 +49,17 @@ Strip dead UIBus producers/consumers and any leftover slash-command registration
 
 **Tasks**
 
-- [ ] `extensions/ui/bus.ts`: remove `SLOT_UNDO` constant, the `UndoState` type (if exported only for this slot), and `publishUndo` function. If `UndoState` is referenced elsewhere, remove only what becomes unused.
-- [ ] `extensions/ui/footer.ts`:
-  - [ ] Remove `SLOT_UNDO` and `UndoState` from the `./bus.js` import.
-  - [ ] Remove the `slots.get(SLOT_UNDO)` lookup at line ~721 and any rendering logic that consumes `undoState` (footer segment for undo/redo counts).
-- [ ] `extensions/ui/README.md`: delete the `undo` row from the slot table and the `publishUndo` mention in the helpers list. Update any reference to `pi-undo-redo.ts`.
-- [ ] Search the codebase for `/undo` and `/redo` slash-command registrations (they lived inside `pi-undo-redo.ts` only — confirm via `grep -rn "registerSlashCommand\|/undo\|/redo" extensions/`); remove any orphans found outside the deleted file.
-- [ ] `AGENTS.md`: remove `pi-undo-redo.ts` from the layout listing and the UIBus slot list (`undo`).
+- [x] `extensions/ui/bus.ts`: removed `SLOT_UNDO`, `UndoState`, `publishUndo`.
+- [x] `extensions/ui/footer.ts`: removed import + render logic.
+- [x] `extensions/ui/README.md`: pruned undo row + helper mention.
+- [x] No orphan `/undo` `/redo` slash commands found outside the deleted file.
+- [x] `AGENTS.md`: removed `pi-undo-redo.ts` listing and `undo` slot.
 
 **Verification (autonomous)**
 
-- [ ] `grep -rn 'SLOT_UNDO\|publishUndo\|UndoState' extensions/` returns nothing.
-- [ ] `grep -rn 'pi-undo-redo' .` (excluding `.git/`) returns nothing.
-- [ ] `bash scripts/check-build.sh` exits 0.
-- [ ] `bash scripts/check-invariants.sh` exits 0 (the invariants script lists slot names; if it pins `undo`, update the script accordingly in this phase and re-run).
-- [ ] `bash scripts/smoke.sh` (if present and previously passing) still passes.
+- [x] No remaining `SLOT_UNDO`/`publishUndo`/`UndoState`/`pi-undo-redo` references.
+- [x] tsc --noEmit clean.
+- [x] `bash scripts/check-invariants.sh` exits 0.
 
 ---
 

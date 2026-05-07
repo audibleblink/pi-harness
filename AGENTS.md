@@ -10,7 +10,6 @@ This repo is a **pi package** — it is not a standalone application. It is load
       "extensions": [
         "+extensions/ask-user-question.ts",
         "+extensions/modes.ts",
-        "+extensions/pi-undo-redo.ts",
         "+extensions/vim-quit.ts",
         "+extensions/ghost-completion.ts",
         "+extensions/ui/index.ts",
@@ -34,7 +33,6 @@ extensions/       # TypeScript pi extensions (loaded by pi at startup)
   ui/             # Sole TUI chrome owner — footer, editor, widget, working indicator
   orchestration/  # Merged agent spawning + task tracking (was pi-subagents + pi-tasks)
   modes.ts        # Mode enforcement (agent/auto/etc)
-  pi-undo-redo.ts # Undo/redo for file edits
   ask-user-question.ts
   vim-quit.ts
   stealth-skills.ts # Hide skills from system prompt while keeping /skill:name (config: stealthSkills in settings.json, /skills to toggle)
@@ -53,7 +51,7 @@ tsconfig.json     # TypeScript config for extensions/ (noEmit, strict)
 - Run `bash scripts/check-build.sh` to type-check after editing.
 - Run `bash scripts/check-invariants.sh` to verify structural invariants (TUI chrome ownership, no stale event names, etc).
 - All TUI chrome calls (`setStatus`, `setWidget`, `setFooter`, `setWorkingMessage`, `setWorkingIndicator`, `setEditorComponent`) must live exclusively in `extensions/ui/`. Other extensions publish state via the UIBus (`extensions/ui/bus.ts`).
-- The UIBus topic is `harness.ui:publish` with envelope `{ slot: string, value: unknown }`. Slot names: `mode`, `undo`, `orchestration`, `working`, `subagentUsage`, `ghost`.
+- The UIBus topic is `harness.ui:publish` with envelope `{ slot: string, value: unknown }`. Slot names: `mode`, `orchestration`, `working`, `subagentUsage`, `ghost`.
 
 ## Where new extensions go
 

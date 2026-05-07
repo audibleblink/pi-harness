@@ -11,7 +11,6 @@ Other extensions publish state changes by calling helpers from `extensions/ui/bu
 | Slot            | Publisher                               | Content shape          |
 |-----------------|-----------------------------------------|------------------------|
 | `mode`          | `extensions/modes.ts`                   | `ModeState \| null`    |
-| `undo`          | `extensions/pi-undo-redo.ts`            | `UndoState \| null`    |
 | `orchestration` | `extensions/orchestration/index.ts`     | `OrchestrationState \| null` |
 | `working`       | `extensions/ui/working.ts` (internal)   | `string \| null`       |
 
@@ -22,8 +21,8 @@ Slots are cleared on `session_start` with `reason: "reload"`.
 | File          | Responsibility                                                          |
 |---------------|-------------------------------------------------------------------------|
 | `index.ts`    | Extension entry, UIBus subscription, slot map, ticker coordination      |
-| `bus.ts`      | Typed publish helpers (`publishMode`, `publishUndo`, `publishOrchestration`, `publishWorking`) |
-| `footer.ts`   | Footer renderer — reads `mode` and `undo` slots, calls `setFooter`      |
+| `bus.ts`      | Typed publish helpers (`publishMode`, `publishOrchestration`, `publishWorking`) |
+| `footer.ts`   | Footer renderer — reads `mode` slot, calls `setFooter`                  |
 | `editor.ts`   | Editor factory registration — calls `setEditorComponent` on activate   |
 | `working.ts`  | Working message/indicator pool — calls `setWorkingMessage` / `setWorkingIndicator` |
 | `widget.ts`   | Combined agent+task widget renderer — reads `orchestration` slot, calls `setWidget` |

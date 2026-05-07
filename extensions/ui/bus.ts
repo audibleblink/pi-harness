@@ -15,7 +15,6 @@ export const UI_BUS_TOPIC = "harness.ui:publish";
 // ─── Slot names ───────────────────────────────────────────────────────────────
 
 export const SLOT_MODE = "mode";
-export const SLOT_UNDO = "undo";
 export const SLOT_ORCHESTRATION = "orchestration";
 export const SLOT_WORKING = "working";
 export const SLOT_SUBAGENT_USAGE = "subagentUsage";
@@ -33,11 +32,6 @@ export interface UiBusEnvelope {
 export interface ModeState {
 	label: string;
 	model?: string;
-}
-
-export interface UndoState {
-	undos: number;
-	redos: number;
 }
 
 export interface AgentEntry {
@@ -82,10 +76,6 @@ export interface GhostController {
 
 export function publishMode(pi: ExtensionAPI, state: ModeState | null): void {
 	pi.events.emit(UI_BUS_TOPIC, { slot: SLOT_MODE, value: state } satisfies UiBusEnvelope);
-}
-
-export function publishUndo(pi: ExtensionAPI, state: UndoState | null): void {
-	pi.events.emit(UI_BUS_TOPIC, { slot: SLOT_UNDO, value: state } satisfies UiBusEnvelope);
 }
 
 export function publishOrchestration(pi: ExtensionAPI, state: OrchestrationState | null): void {
