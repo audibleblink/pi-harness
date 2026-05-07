@@ -34,7 +34,8 @@ export function getLegacyPersonalAgentsDir(): string {
  * Discovery hierarchy (higher priority wins, later overrides earlier):
  *   1. Legacy personal: ~/.pi/agent/agents/*.md            (backward compat)
  *   2. Personal (XDG):  $PI_CODING_AGENT_DIR or ~/.config/pi/agent/agents/*.md
- *   3. Project:         <cwd>/.pi/agents/*.md
+ *   3. Packages (global+project settings.json) → <packageRoot>/agents/*.md
+ *   4. Project:         <cwd>/.pi/agents/*.md
  *
  * Any name is allowed — names matching defaults (e.g. "Explore") override them.
  */
@@ -46,8 +47,58 @@ export function loadCustomAgents(cwd: string): Map<string, AgentConfig> {
   const agents = new Map<string, AgentConfig>();
   loadFromDir(legacyDir, agents, "global");    // lowest priority (legacy)
   if (personalDir !== legacyDir) loadFromDir(personalDir, agents, "global");
+  for (const { root, scope } of resolvePackageAgentRoots(cwd)) {
+    loadFromDir(join(root, "agents"), agents, scope);
+  }
   loadFromDir(projectDir, agents, "project");  // highest priority
   return agents;
+}
+
+/** Settings.json paths: project (<cwd>/.pi/settings.json) and global (XDG personal dir parent). */
+function resolvePackageAgentRoots(cwd: string): Array<{ root: string; scope: "project" | "global" }> {
+  const out: Array<{ root: string; scope: "project" | "global" }> = [];
+  const personalParent = join(getPersonalAgentsDir(), ".."); // ~/.config/pi/agent
+  const globalSettings = join(personalParent, "settings.json");
+  const projectSettings = join(cwd, ".pi", "settings.json");
+
+  // Global first (lower priority), then project (higher priority)
+  for (const pkg of readPackages(globalSettings)) {
+    const root = resolvePackageRoot(pkg, personalParent);
+    if (root) out.push({ root, scope: "global" });
+  }
+  for (const pkg of readPackages(projectSettings)) {
+    const root = resolvePackageRoot(pkg, join(cwd, ".pi"));
+    if (root) out.push({ root, scope: "project" });
+  }
+  return out;
+}
+
+function readPackages(settingsPath: string): Array<string | { source?: string }> {
+  if (!existsSync(settingsPath)) return [];
+  try {
+    const data = JSON.parse(readFileSync(settingsPath, "utf-8"));
+    return Array.isArray(data.packages) ? data.packages : [];
+  } catch { return []; }
+}
+
+/** Resolve a package source spec to a local directory, if it exists. */
+function resolvePackageRoot(pkg: string | { source?: string }, settingsDir: string): string | undefined {
+  const source = (typeof pkg === "string" ? pkg : pkg.source)?.trim();
+  if (!source) return undefined;
+  // Local path (absolute, ~, or relative to settings dir)
+  if (source.startsWith("/") || source.startsWith("~") || source.startsWith(".")) {
+    const expanded = source.startsWith("~") ? join(homedir(), source.slice(source[1] === "/" ? 2 : 1)) : source;
+    const abs = expanded.startsWith("/") ? expanded : join(settingsDir, expanded);
+    return existsSync(abs) ? abs : undefined;
+  }
+  // Git URL → check pi's cache layout: ~/.config/pi/agent/git/<host>/<owner>/<repo>
+  const m = source.match(/^(?:https?:\/\/|git@)([^/:]+)[/:]([^/]+)\/([^/.]+)(?:\.git)?\/?$/);
+  if (m) {
+    const [, host, owner, repo] = m;
+    const cached = join(getPersonalAgentsDir(), "..", "git", host, owner, repo);
+    return existsSync(cached) ? cached : undefined;
+  }
+  return undefined;
 }
 
 /** Load agent configs from a directory into the map. */
