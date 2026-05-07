@@ -23,7 +23,7 @@ import {
 	truncateToWidth,
 	visibleWidth,
 } from "@mariozechner/pi-tui";
-import { SLOT_GHOST, SLOT_MODE, type GhostController, type ModeState } from "./bus.js";
+import { SLOT_BLUR, SLOT_GHOST, SLOT_MODE, type GhostController, type ModeState } from "./bus.js";
 import type { FooterHandle, ThemeLike } from "./footer.js";
 
 // ────────────────────────── helpers ──────────────────────────
@@ -82,6 +82,7 @@ class PolishedEditor extends CustomEditor {
 		getAgentMeta: () => string | undefined,
 		getTopRightLabel: () => string | undefined,
 		ghost?: GhostController,
+		isBlurred?: () => boolean,
 	) {
 		super(tui, theme, keybindings, { paddingX: 0 });
 		this.borderColor = (text: string) => uiTheme.fg("border", text);
@@ -91,7 +92,10 @@ class PolishedEditor extends CustomEditor {
 		this.getAgentMeta = getAgentMeta;
 		this.getTopRightLabel = getTopRightLabel;
 		this.ghost = ghost;
+		this.isBlurred = isBlurred;
 	}
+
+	private readonly isBlurred?: () => boolean;
 
 	handleInput(data: string): void {
 		if (this.ghost && data === "\t") {
@@ -160,9 +164,10 @@ class PolishedEditor extends CustomEditor {
 		const borderColor = isBashMode ? "mdCode" : "border";
 		const textPrefix = isBashMode ? this.uiTheme.getFgAnsi("mdCode") : "";
 		let coloredEditorLines = editorLines.map((l) => (textPrefix ? `${textPrefix}${l}` : l));
+		const blurred = this.isBlurred?.() ?? false;
 
 		// Inject ghost-text suggestion after the cursor when editor is empty.
-		const ghostText = this.ghost && this.getText().length === 0 ? this.ghost.getSuggestion() : "";
+		const ghostText = !blurred && this.ghost && this.getText().length === 0 ? this.ghost.getSuggestion() : "";
 		if (ghostText) {
 			const dim = `\x1b[2m${this.uiTheme.fg("muted", ghostText)}\x1b[22m`;
 			for (let i = 0; i < coloredEditorLines.length; i++) {
@@ -175,6 +180,11 @@ class PolishedEditor extends CustomEditor {
 				coloredEditorLines[i] = line.slice(0, insertAt) + dim + line.slice(insertAt);
 				break;
 			}
+		}
+		if (blurred) {
+			coloredEditorLines = coloredEditorLines.map((l) =>
+				l.replace(/\x1b\[7m/g, "").replace(/\x1b\[27m/g, ""),
+			);
 		}
 		const leftRail = `${this.uiTheme.fg(railColor, "│")}${this.reset} `;
 		const rightRail = ` ${this.uiTheme.fg(borderColor, "│")}${this.reset}`;
@@ -271,6 +281,7 @@ export function registerEditor(
 			},
 			() => handle.buildCwdGitSegment(uiTheme as unknown as ThemeLike),
 			ghost,
+			() => slots.get(SLOT_BLUR) === true,
 		);
 
 		const originalHandleInput = editor.handleInput.bind(editor);

@@ -19,6 +19,7 @@ export const SLOT_ORCHESTRATION = "orchestration";
 export const SLOT_WORKING = "working";
 export const SLOT_SUBAGENT_USAGE = "subagentUsage";
 export const SLOT_GHOST = "ghost";
+export const SLOT_BLUR = "blur";
 
 // ─── Envelope ─────────────────────────────────────────────────────────────────
 
@@ -92,4 +93,8 @@ export function publishSubagentUsage(pi: ExtensionAPI, state: SubagentUsageState
 
 export function publishGhost(pi: ExtensionAPI, controller: GhostController | null): void {
 	pi.events.emit(UI_BUS_TOPIC, { slot: SLOT_GHOST, value: controller } satisfies UiBusEnvelope);
+}
+
+export function publishBlur(pi: ExtensionAPI, blurred: boolean): void {
+	pi.events.emit(UI_BUS_TOPIC, { slot: SLOT_BLUR, value: blurred } satisfies UiBusEnvelope);
 }
