@@ -6,7 +6,7 @@
  */
 
 import type { OrchestrationState, AgentEntry, TaskEntry, SubagentUsageState } from "./bus.js";
-import { SPINNER, formatMs } from "../orchestration/agent-display.js";
+import { SPINNER, formatMs } from "../agents/internal/agent-display.js";
 import { formatCount } from "./format.js";
 
 // ─── ANSI helpers ─────────────────────────────────────────────────────────────

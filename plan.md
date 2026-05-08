@@ -347,15 +347,15 @@ Asserts (autonomously):
 
 **Tasks**
 
-- [ ] Move/rename internal modules into `extensions/agents/internal/` (and `extensions/tasks/internal/` if any).
-- [ ] Update all imports.
-- [ ] Delete `extensions/modes.ts` and `extensions/orchestration/`.
-- [ ] Frontmatter audit: edit each `agents/*.md` to declare `mode:` explicitly.
-- [ ] Update tracked `settings.json` (extensions list + `defaultPrimaryAgent` rename + remove enabled flags).
-- [ ] Remove the transitional primary-detection rule from `loader.ts`.
-- [ ] Update `scripts/check-invariants.sh` with the two "gone" checks.
-- [ ] Update `AGENTS.md` layout section.
-- [ ] Run `bash scripts/check-build.sh`, `bash scripts/check-invariants.sh`, `bash scripts/phase7-verify.sh`.
+- [x] Move/rename internal modules into `extensions/agents/internal/` (and `extensions/tasks/internal/` if any).
+- [x] Update all imports.
+- [x] Delete `extensions/modes.ts` and `extensions/orchestration/`.
+- [x] Frontmatter audit: edit each `agents/*.md` to declare `mode:` explicitly.
+- [x] Update tracked `settings.json` (extensions list + `defaultPrimaryAgent` rename + remove enabled flags).
+- [x] Remove the transitional primary-detection rule from `loader.ts`.
+- [x] Update `scripts/check-invariants.sh` with the two "gone" checks.
+- [x] Update `AGENTS.md` layout section.
+- [x] Run `bash scripts/check-build.sh`, `bash scripts/check-invariants.sh`, `bash scripts/phase7-verify.sh`.
 
 **Phase-local verify script (`scripts/phase7-verify.sh`)**
 

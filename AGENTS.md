@@ -9,11 +9,11 @@ This repo is a **pi package** — it is not a standalone application. It is load
       "source": "/Users/blink/Code/pi-harness",
       "extensions": [
         "+extensions/ask-user-question.ts",
-        "+extensions/modes.ts",
         "+extensions/vim-quit.ts",
         "+extensions/ghost-completion.ts",
+        "+extensions/agents/index.ts",
+        "+extensions/tasks/index.ts",
         "+extensions/ui/index.ts",
-        "+extensions/orchestration/index.ts",
         "+extensions/stealth-skills.ts",
         "+extensions/notify-macos.ts"
       ]
@@ -31,8 +31,8 @@ This repo is a **pi package** — it is not a standalone application. It is load
 ```
 extensions/       # TypeScript pi extensions (loaded by pi at startup)
   ui/             # Sole TUI chrome owner — footer, editor, widget, working indicator
-  orchestration/  # Merged agent spawning + task tracking (was pi-subagents + pi-tasks)
-  modes.ts        # Mode enforcement (agent/auto/etc)
+  agents/         # Primary-mode + subagent spawning + @-dispatch + lifecycle events
+  tasks/          # Task* tools, TaskStore, auto-clear, cascade-on-subagent-end
   ask-user-question.ts
   vim-quit.ts
   stealth-skills.ts # Hide skills from system prompt while keeping /skill:name (config: stealthSkills in settings.json, /skills to toggle)

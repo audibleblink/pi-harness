@@ -1,4 +1,5 @@
 ---
+mode: subagent
 display_name: Explore
 description: Fast codebase exploration agent (read-only)
 tools: read, bash, grep, find, ls

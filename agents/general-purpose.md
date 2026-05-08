@@ -1,4 +1,5 @@
 ---
+mode: subagent
 display_name: Agent
 description: General-purpose agent for complex, multi-step tasks
 tools: read, bash, edit, write, grep, find, ls   # omit = all builtins; "none" = no builtins

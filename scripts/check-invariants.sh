@@ -44,6 +44,8 @@ check "pi-tasks dir gone" "$(ls -d extensions/pi-tasks 2>/dev/null | wc -l | tr 
 check "zentui.ts gone" "$(ls extensions/zentui.ts 2>/dev/null | wc -l | tr -d ' ')" "0"
 check "working-messages.ts gone" "$(ls extensions/working-messages.ts 2>/dev/null | wc -l | tr -d ' ')" "0"
 check "_debug.ts gone" "$(ls extensions/_debug.ts 2>/dev/null | wc -l | tr -d ' ')" "0"
+check "extensions/modes.ts gone" "$(ls extensions/modes.ts 2>/dev/null | wc -l | tr -d ' ')" "0"
+check "extensions/orchestration/ dir gone" "$(ls -d extensions/orchestration 2>/dev/null | wc -l | tr -d ' ')" "0"
 
 # setInterval audit (informational)
 echo ""
@@ -51,8 +53,8 @@ echo "=== setInterval audit (informational) ==="
 rg -n 'setInterval\(' extensions/ -g '*.ts' || true
 echo "  Expected:"
 echo "    extensions/ui/ticker.ts          — animation ticker (80ms, widget animation)"
-echo "    extensions/orchestration/agent-manager.ts — 60s GC cleanup (non-animation)"
-echo "    extensions/orchestration/index.ts — foreground spinner during spawnAndWait (non-animation, cleared immediately)"
+echo "    extensions/agents/internal/agent-manager.ts — 60s GC cleanup (non-animation)"
+echo "    extensions/agents/subagent-tools.ts — foreground spinner during spawnAndWait (non-animation, cleared immediately)"
 
 # setTitle audit (informational — allowed outside ui/, just noted)
 echo ""

@@ -8,11 +8,6 @@
  *
  * Merges JSON entries from settings.json `agent` map (JSON wins on
  * collision). Returns Map<string, AgentDefinition> + load errors.
- *
- * Installs the same transitional primary-cycling gate P1 added to
- * modes.ts: in-repo agents lacking explicit `mode:` AND lacking
- * `prompt_mode`/`display_name` are excluded from the primary cycle.
- * Removed in P7 once every file declares `mode:` explicitly.
  */
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -71,12 +66,9 @@ function findAgentFiles(...dirs: string[]): string[] {
 	return files;
 }
 
-/** Transitional primary-cycling gate (see file header). */
 function primaryEligible(def: AgentDef): boolean {
 	if (def.disable === true) return false;
-	if (def.mode !== "primary" && def.mode !== "all") return false;
-	if (def.modeImplicit && !def.prompt_mode && !def.display_name) return false;
-	return true;
+	return def.mode === "primary" || def.mode === "all";
 }
 
 function defToDefinition(name: string, def: AgentDef): AgentDefinition {

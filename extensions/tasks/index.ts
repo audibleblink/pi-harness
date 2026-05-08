@@ -1,10 +1,8 @@
 /**
- * tasks/ — TaskStore + Task* tools + auto-clear (P5).
+ * tasks/ — TaskStore + Task* tools + auto-clear.
  *
  * Owns: TaskCreate, TaskList, TaskGet, TaskUpdate, TaskOutput, TaskStop, TaskExecute.
- * Gated behind `settings.tasks.enabled`. While disabled, orchestration/ continues to
- * own tasks (P5 parallel-extension strategy). Cascade-on-completion stays in
- * orchestration/ for P5; P6 moves it here via `agents:subagent_end`.
+ * Cascade-on-completion subscribes to `agents:subagent_end`.
  *
  * No TUI chrome calls. Publishes orchestration state via UIBus.
  */
@@ -12,7 +10,6 @@
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { getAgentDir } from "@mariozechner/pi-coding-agent";
 import { publishOrchestration } from "../ui/bus.js";
 import type { OrchestrationState } from "../ui/bus.js";
 import { AutoClearManager } from "./auto-clear.js";
@@ -27,10 +24,6 @@ import { register as registerOutput } from "./tools/output.js";
 import { register as registerStop } from "./tools/stop.js";
 import { register as registerUpdate } from "./tools/update.js";
 
-interface Settings {
-  tasks?: { enabled?: boolean };
-}
-
 interface TasksConfig {
   taskScope?: "memory" | "session" | "project";
   autoCascade?: boolean;
@@ -39,18 +32,6 @@ interface TasksConfig {
 
 const AUTO_CLEAR_DELAY = 4;
 
-function loadSettings(): Settings {
-  const paths = [
-    join(getAgentDir(), "settings.json"),
-    join(process.cwd(), ".pi", "settings.json"),
-  ];
-  let merged: Settings = {};
-  for (const p of paths) {
-    try { merged = { ...merged, ...JSON.parse(readFileSync(p, "utf-8")) }; } catch { /* skip */ }
-  }
-  return merged;
-}
-
 function loadTasksConfig(): TasksConfig {
   try {
     return JSON.parse(readFileSync(join(process.cwd(), ".pi", "tasks-config.json"), "utf-8"));
@@ -58,9 +39,6 @@ function loadTasksConfig(): TasksConfig {
 }
 
 export default function (pi: ExtensionAPI) {
-  const settings = loadSettings();
-  if (!settings.tasks?.enabled) return;
-
   const cfg = loadTasksConfig();
   const piTasks = process.env.PI_TASKS;
   const taskScope = cfg.taskScope ?? "session";

@@ -5,9 +5,9 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
-import { parseAgentFrontmatter } from "../_agent-schema/parse-frontmatter.js";
-import { loadSettingsAgents } from "../_agent-schema/load-settings-agents.js";
-import type { AgentDef } from "../_agent-schema/types.js";
+import { parseAgentFrontmatter } from "../../_agent-schema/parse-frontmatter.js";
+import { loadSettingsAgents } from "../../_agent-schema/load-settings-agents.js";
+import type { AgentDef } from "../../_agent-schema/types.js";
 import { BUILTIN_TOOL_NAMES } from "./agent-types.js";
 import type { AgentConfig, MemoryScope, ThinkingLevel } from "./types.js";
 

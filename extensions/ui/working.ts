@@ -6,7 +6,7 @@
  */
 
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { SPINNER } from "../orchestration/agent-display.js";
+import { SPINNER } from "../agents/internal/agent-display.js";
 import { TICK_INTERVAL_MS } from "./ticker.js";
 
 const MESSAGES = [

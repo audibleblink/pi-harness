@@ -1,4 +1,5 @@
 ---
+mode: subagent
 display_name: Plan
 description: Software architect for implementation planning (read-only)
 tools: read, bash, grep, find, ls

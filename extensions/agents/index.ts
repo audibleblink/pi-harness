@@ -1,13 +1,8 @@
 /**
- * extensions/agents/ — unified agent system (Phase 2 skeleton).
+ * extensions/agents/ — unified agent system.
  *
- * Owns primary-mode behavior (loader + applyAgent + /agent[s] + cycling).
- * Subagent tools, @-dispatch, and lifecycle events arrive in P3/P4.
- *
- * Activation is gated by settings.agents.enabled. While that flag is off
- * (the default in P2), the legacy extensions/modes.ts continues to own
- * primary modes; modes.ts has a 5-line guard to short-circuit when the
- * flag is on, ensuring exactly one owner.
+ * Owns primary-mode behavior (loader + applyAgent + /agent[s] + cycling),
+ * subagent spawning tools, @-dispatch, and lifecycle events.
  */
 
 import { readFileSync } from "node:fs";
@@ -32,7 +27,6 @@ import type { AgentDef } from "../_agent-schema/types.js";
 
 interface Settings {
 	defaultPrimaryAgent?: string;
-	agents?: { enabled?: boolean };
 }
 
 function loadSettings(cwd: string): Settings {
@@ -53,13 +47,6 @@ function loadSettings(cwd: string): Settings {
 }
 
 export default function agentsExtension(pi: ExtensionAPI) {
-	// Load-time gate: while agents.enabled is off, the legacy modes.ts owns
-	// primary-mode behavior (including the --agent flag, /agent[s] commands,
-	// and Tab/Ctrl+Shift+M cycling). Stay completely inert to avoid duplicate
-	// registrations.
-	const bootSettings = loadSettings(process.cwd());
-	if (!bootSettings.agents?.enabled) return;
-
 	const state: AgentsState = {
 		agents: new Map(),
 		activeAgent: undefined,
@@ -98,8 +85,6 @@ export default function agentsExtension(pi: ExtensionAPI) {
 
 	pi.on("session_start", async (event, ctx) => {
 		const settings = loadSettings(ctx.cwd);
-		if (!settings.agents?.enabled) return; // P2: opt-in only
-
 		subagentRuntime.setCurrentCtx(ctx);
 		subagentRuntime.manager.clearCompleted();
 		subagentRuntime.schedulePublish();

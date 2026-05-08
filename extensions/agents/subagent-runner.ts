@@ -1,33 +1,28 @@
 /**
  * Subagent runtime for extensions/agents/.
  *
- * Wraps the existing extensions/orchestration/ runner machinery (AgentManager,
- * agent-runner, group-join) and re-exposes a small surface for the three
- * subagent tool registrations in subagent-tools.ts.
- *
- * Cross-extension import note: this file imports from ../orchestration/.
- * That is an EXPLICITLY ALLOWLISTED transitional import for Phase 3–6.
- * It is removed in Phase 7 when orchestration/ is deleted and the runner
- * files move to extensions/agents/internal/.
+ * Wraps the runner machinery (AgentManager, agent-runner, group-join) under
+ * ./internal/ and re-exposes a small surface for the three subagent tool
+ * registrations in subagent-tools.ts.
  *
  * Lifecycle: emits `agents:subagent_end` on subagent completion (success,
  * failure, stopped) — see lifecycle-events.ts for the payload shape.
  */
 
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { AgentManager } from "../orchestration/agent-manager.js";
-import { GroupJoinManager } from "../orchestration/group-join.js";
+import { AgentManager } from "./internal/agent-manager.js";
+import { GroupJoinManager } from "./internal/group-join.js";
 import {
 	type AgentActivity,
 	describeActivity,
 	formatTokens,
-} from "../orchestration/agent-display.js";
+} from "./internal/agent-display.js";
 import type {
 	AgentRecord,
 	JoinMode,
 	NotificationDetails,
 	SubagentType,
-} from "../orchestration/types.js";
+} from "./internal/types.js";
 import type { OrchestrationState, SubagentUsageState } from "../ui/bus.js";
 import { createPublisher } from "./subagent-bus.js";
 import {
@@ -36,7 +31,7 @@ import {
 	type SubagentEndStatus,
 } from "./lifecycle-events.js";
 
-// ─── Helpers (ported from orchestration/index.ts) ─────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function safeUsage(session: { getSessionStats(): { tokens?: { total?: number }; cost?: number } } | undefined): { tokens: number; cost: number } {
 	if (!session) return { tokens: 0, cost: 0 };

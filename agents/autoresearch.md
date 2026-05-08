@@ -1,4 +1,5 @@
 ---
+mode: subagent
 description: Autonomous experiment loop agent — optimizes any target by trying ideas, benchmarking, keeping wins, and looping forever
 tools: read, bash, edit, write, grep, find, ls
 extensions: pi-autoresearch

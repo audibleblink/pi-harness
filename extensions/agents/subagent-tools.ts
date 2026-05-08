@@ -1,10 +1,7 @@
 /**
  * Subagent tool registrations: Agent, get_subagent_result, steer_subagent.
  *
- * Schemas + handler logic ported verbatim from extensions/orchestration/index.ts.
- * Behaviour-preserving: when extensions/agents/ owns these tools (agents.enabled
- * = true), it must publish identical UIBus state and emit identical
- * notifications.
+ * Schemas + handler logic for agent spawning, result retrieval, and steering.
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
@@ -21,13 +18,13 @@ import {
 	getDisplayName,
 	getPromptModeLabel,
 	SPINNER,
-} from "../orchestration/agent-display.js";
+} from "./internal/agent-display.js";
 import {
 	getAgentConversation,
 	getDefaultMaxTurns,
 	normalizeMaxTurns,
 	steerAgent,
-} from "../orchestration/agent-runner.js";
+} from "./internal/agent-runner.js";
 import {
 	getAgentConfig,
 	getAvailableTypes,
@@ -35,12 +32,12 @@ import {
 	getUserAgentNames,
 	registerAgents,
 	resolveType,
-} from "../orchestration/agent-types.js";
-import { loadCustomAgents } from "../orchestration/custom-agents.js";
-import { resolveAgentInvocationConfig, resolveJoinMode } from "../orchestration/invocation-config.js";
-import { resolveModel } from "../orchestration/model-resolver.js";
-import { createOutputFilePath, streamToOutputFile, writeInitialEntry } from "../orchestration/output-file.js";
-import type { SubagentType } from "../orchestration/types.js";
+} from "./internal/agent-types.js";
+import { loadCustomAgents } from "./internal/custom-agents.js";
+import { resolveAgentInvocationConfig, resolveJoinMode } from "./internal/invocation-config.js";
+import { resolveModel } from "./internal/model-resolver.js";
+import { createOutputFilePath, streamToOutputFile, writeInitialEntry } from "./internal/output-file.js";
+import type { SubagentType } from "./internal/types.js";
 import type { SubagentRuntime } from "./subagent-runner.js";
 import type { PermissionMap } from "../_agent-schema/types.js";
 import { checkTaskPermission, PERMISSION_ASK_EVENT } from "./spawn.js";
