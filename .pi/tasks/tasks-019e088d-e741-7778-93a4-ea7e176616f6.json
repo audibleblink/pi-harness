@@ -1,0 +1,20 @@
+{
+  "nextId": 2,
+  "tasks": [
+    {
+      "id": "1",
+      "subject": "Phase 1 — Agent schema parser",
+      "description": "Implement Phase 1 of plan.md exactly as specified. See plan.md \"Phase 1 — Schema parser\" section for the full deliverables, tasks, and verify script. Summary:\n\n1. Create `extensions/_agent-schema/` with seven files: types.ts, parse-frontmatter.ts, parse-json.ts, permission.ts, prompt-resolver.ts, tools-spec.ts, defaults.ts. Plus load-settings-agents.ts helper.\n2. Confirm pi auto-loader skips leading-underscore dirs by reading docs at `$PI_CODING_AGENT_DIR` extensions docs. If it does NOT skip, relocate to `lib/agent-schema/` and update all imports.\n3. Implement the opencode-parity schema per PRD \"Agent Definition Schema\" (mode default = \"all\", description required for subagents, permission map validation with shorthand + per-pattern object, tools accepts both opencode object shape and PI comma-string, prompt {file:...} resolver, alias collapse maxSteps→steps and enabled:false→disable:true, retain all PI-specific fields).\n4. Refactor `extensions/modes.ts` to delegate to parseAgentFrontmatter; install transitional primary-cycling gate (exclude in-repo agents lacking explicit mode: AND lacking prompt_mode/display_name).\n5. Refactor `extensions/orchestration/custom-agents.ts` and `extensions/orchestration/agent-types.ts` to delegate to parseAgentFrontmatter.\n6. Wire loadSettingsAgents at both call sites (modes.ts + orchestration/custom-agents.ts), JSON wins over markdown by name.\n7. Create `scripts/phase1-verify.sh` exactly as specified — must check seven files exist, ≥2 hits for parseAgentFrontmatter in old extensions, ≥1 hit for parseAgentJson, run an embedded `npx tsx` harness covering all 11 listed parser behaviors, and run check-build.sh.\n8. Both `bash scripts/check-build.sh` and `bash scripts/check-invariants.sh` and `bash scripts/phase1-verify.sh` must exit 0.\n9. After all checks green, update plan.md: change every `- [ ]` to `- [x]` only within the \"## Phase 1\" section's task lists.\n10. Commit with message: `phase 1: agent schema parser (opencode parity)`.\n\nDo NOT proceed to Phase 2. Read prd.md and plan.md first for full context. Keep every file ≤250 lines. Strict validation errors must not abort the extension load — they must surface via the existing agent-load error path and other agents continue loading.\n\nReport back: list of files created, verify script output summary, commit SHA.",
+      "status": "in_progress",
+      "metadata": {
+        "agentType": "general-purpose",
+        "agentId": "20017b41-b1a1-48c"
+      },
+      "blocks": [],
+      "blockedBy": [],
+      "createdAt": 1778260101957,
+      "updatedAt": 1778260103903,
+      "owner": "20017b41-b1a1-48c"
+    }
+  ]
+}

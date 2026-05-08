@@ -11,4 +11,5 @@ if [ -z "$TSC" ]; then
   exit 1
 fi
 
-exec node "$TSC" --noEmit -p /Users/blink/Code/pi-harness
+REPO="$(cd "$(dirname "$0")/.." && pwd)"
+exec node "$TSC" --noEmit -p "$REPO"

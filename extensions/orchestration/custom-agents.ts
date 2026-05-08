@@ -5,7 +5,9 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
-import { parseFrontmatter } from "@mariozechner/pi-coding-agent";
+import { parseAgentFrontmatter } from "../_agent-schema/parse-frontmatter.js";
+import { loadSettingsAgents } from "../_agent-schema/load-settings-agents.js";
+import type { AgentDef } from "../_agent-schema/types.js";
 import { BUILTIN_TOOL_NAMES } from "./agent-types.js";
 import type { AgentConfig, MemoryScope, ThinkingLevel } from "./types.js";
 
@@ -51,7 +53,67 @@ export function loadCustomAgents(cwd: string): Map<string, AgentConfig> {
     loadFromDir(join(root, "agents"), agents, scope);
   }
   loadFromDir(projectDir, agents, "project");  // highest priority
+
+  // JSON-defined agents (settings.json `agent` map) override markdown by name.
+  const personalParent = join(getPersonalAgentsDir(), "..");
+  for (const sp of [join(personalParent, "settings.json"), join(cwd, ".pi", "settings.json")]) {
+    if (!existsSync(sp)) continue;
+    try {
+      const settings = JSON.parse(readFileSync(sp, "utf-8"));
+      const { defs, errors } = loadSettingsAgents(settings, sp);
+      for (const e of errors) console.error(`[orchestration] ${e}`);
+      for (const [name, def] of defs) {
+        // Subagent-eligible: mode subagent or all (default).
+        if (def.mode !== "subagent" && def.mode !== "all") continue;
+        if (def.disable === true) continue;
+        agents.set(name, fromAgentDef(name, def, sp.includes("/.pi/") ? "project" : "global"));
+      }
+    } catch {
+      // skip
+    }
+  }
   return agents;
+}
+
+/** Map a parsed AgentDef to the orchestration AgentConfig shape. */
+function fromAgentDef(name: string, def: AgentDef, source: "project" | "global"): AgentConfig {
+  const csvTools = def.tools?.kind === "csv" ? Array.from(def.tools.allowed) : undefined;
+  return {
+    name,
+    displayName: def.display_name,
+    description: def.description ?? name,
+    builtinToolNames: csvTools ?? BUILTIN_TOOL_NAMES,
+    disallowedTools: Array.isArray(def.disallowed_tools)
+      ? def.disallowed_tools.filter((t): t is string => typeof t === "string") : undefined,
+    extensions: inheritFromDef(def.extensions),
+    skills: inheritFromDef(def.skills),
+    model: def.model,
+    thinking: def.thinkingLevel as ThinkingLevel | undefined,
+    maxTurns: typeof def.max_turns === "number" && def.max_turns >= 0 ? def.max_turns : undefined,
+    systemPrompt: (def.prompt ?? def.body ?? "").trim(),
+    promptMode: def.prompt_mode === "append" ? "append" : "replace",
+    inheritContext: def.inherit_context,
+    runInBackground: def.run_in_background,
+    isolated: def.isolated,
+    memory: parseMemory(def.memory),
+    isolation: def.isolation === "worktree" ? "worktree" : undefined,
+    enabled: def.disable !== true && def.enabled !== false,
+    source,
+  };
+}
+
+function inheritFromDef(val: unknown): true | string[] | false {
+  if (val === undefined || val === null || val === true) return true;
+  if (val === false || val === "none") return false;
+  if (Array.isArray(val)) {
+    const items = val.filter((v): v is string => typeof v === "string");
+    return items.length > 0 ? items : false;
+  }
+  if (typeof val === "string") {
+    const items = val.split(",").map(t => t.trim()).filter(Boolean);
+    return items.length > 0 ? items : false;
+  }
+  return true;
 }
 
 /** Settings.json paths: project (<cwd>/.pi/settings.json) and global (XDG personal dir parent). */
@@ -113,98 +175,26 @@ function loadFromDir(dir: string, agents: Map<string, AgentConfig>, source: "pro
   }
 
   for (const file of files) {
-    const name = basename(file, ".md");
-
+    const filePath = join(dir, file);
     let content: string;
     try {
-      content = readFileSync(join(dir, file), "utf-8");
+      content = readFileSync(filePath, "utf-8");
     } catch {
       continue;
     }
-
-    const { frontmatter: fm, body } = parseFrontmatter<Record<string, unknown>>(content);
-
-    agents.set(name, {
-      name,
-      displayName: str(fm.display_name),
-      description: str(fm.description) ?? name,
-      builtinToolNames: csvList(fm.tools, BUILTIN_TOOL_NAMES),
-      disallowedTools: csvListOptional(fm.disallowed_tools),
-      extensions: inheritField(fm.extensions ?? fm.inherit_extensions),
-      skills: inheritField(fm.skills ?? fm.inherit_skills),
-      model: str(fm.model),
-      thinking: str(fm.thinking) as ThinkingLevel | undefined,
-      maxTurns: nonNegativeInt(fm.max_turns),
-      systemPrompt: body.trim(),
-      promptMode: fm.prompt_mode === "append" ? "append" : "replace",
-      inheritContext: fm.inherit_context != null ? fm.inherit_context === true : undefined,
-      runInBackground: fm.run_in_background != null ? fm.run_in_background === true : undefined,
-      isolated: fm.isolated != null ? fm.isolated === true : undefined,
-      memory: parseMemory(fm.memory),
-      isolation: fm.isolation === "worktree" ? "worktree" : undefined,
-      enabled: fm.enabled !== false,  // default true; explicitly false disables
-      source,
-    });
+    const res = parseAgentFrontmatter(content, filePath);
+    if (!res.ok) {
+      console.error(`[orchestration] ${res.error}`);
+      continue;
+    }
+    const def = res.def;
+    const name = basename(file, ".md");
+    agents.set(name, fromAgentDef(name, def, source));
   }
 }
 
-// ---- Field parsers ----
-// All follow the same convention: omitted → default, "none"/empty → nothing, value → exact.
-
-/** Extract a string or undefined. */
-function str(val: unknown): string | undefined {
-  return typeof val === "string" ? val : undefined;
-}
-
-/** Extract a non-negative integer or undefined. 0 means unlimited for max_turns. */
-function nonNegativeInt(val: unknown): number | undefined {
-  return typeof val === "number" && val >= 0 ? val : undefined;
-}
-
-/**
- * Parse a raw CSV field value into items, or undefined if absent/empty/"none".
- */
-function parseCsvField(val: unknown): string[] | undefined {
-  if (val === undefined || val === null) return undefined;
-  const s = String(val).trim();
-  if (!s || s === "none") return undefined;
-  const items = s.split(",").map(t => t.trim()).filter(Boolean);
-  return items.length > 0 ? items : undefined;
-}
-
-/**
- * Parse a comma-separated list field with defaults.
- * omitted → defaults; "none"/empty → []; csv → listed items.
- */
-function csvList(val: unknown, defaults: string[]): string[] {
-  if (val === undefined || val === null) return defaults;
-  return parseCsvField(val) ?? [];
-}
-
-/**
- * Parse an optional comma-separated list field.
- * omitted → undefined; "none"/empty → undefined; csv → listed items.
- */
-function csvListOptional(val: unknown): string[] | undefined {
-  return parseCsvField(val);
-}
-
-/**
- * Parse a memory scope field.
- * omitted → undefined; "user"/"project"/"local" → MemoryScope.
- */
+/** Memory scope coercion. */
 function parseMemory(val: unknown): MemoryScope | undefined {
   if (val === "user" || val === "project" || val === "local") return val;
   return undefined;
-}
-
-/**
- * Parse an inherit field (extensions, skills).
- * omitted/true → true (inherit all); false/"none"/empty → false; csv → listed names.
- */
-function inheritField(val: unknown): true | string[] | false {
-  if (val === undefined || val === null || val === true) return true;
-  if (val === false || val === "none") return false;
-  const items = csvList(val, []);
-  return items.length > 0 ? items : false;
 }

@@ -42,7 +42,10 @@ import { fileURLToPath } from "node:url";
 import type { Api, Model } from "@mariozechner/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { publishMode } from "./ui/bus.js";
-import { DynamicBorder, getAgentDir, parseFrontmatter } from "@mariozechner/pi-coding-agent";
+import { DynamicBorder, getAgentDir } from "@mariozechner/pi-coding-agent";
+import { parseAgentFrontmatter } from "./_agent-schema/parse-frontmatter.js";
+import { loadSettingsAgents } from "./_agent-schema/load-settings-agents.js";
+import type { AgentDef } from "./_agent-schema/types.js";
 import { Container, Key, type SelectItem, SelectList, Text } from "@mariozechner/pi-tui";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -58,6 +61,7 @@ interface AgentDefinition {
 
 interface Settings {
 	defaultAgent?: string;
+	agent?: Record<string, unknown>;
 }
 
 interface OriginalState {
@@ -134,6 +138,24 @@ function findAgentFiles(...dirs: string[]): string[] {
 	return files;
 }
 
+/**
+ * Transitional primary-cycling gate.
+ *
+ * The new schema's default `mode` is "all" (= primary-eligible). To avoid
+ * sweeping today's subagent-only files into primary cycling during P1–P6, we
+ * exclude in-repo agents that lack BOTH an explicit `mode:` AND any
+ * primary-only field (`prompt_mode`, `display_name`). Removed in P7 once
+ * every file declares `mode:` explicitly.
+ */
+function primaryEligible(def: AgentDef): boolean {
+	if (def.disable === true) return false;
+	if (def.mode === "primary" || def.mode === "all") {
+		if (def.modeImplicit && !def.prompt_mode && !def.display_name) return false;
+		return true;
+	}
+	return false;
+}
+
 function parseAgentFile(filePath: string): AgentDefinition | undefined {
 	let content: string;
 	try {
@@ -141,27 +163,28 @@ function parseAgentFile(filePath: string): AgentDefinition | undefined {
 	} catch {
 		return undefined;
 	}
+	const res = parseAgentFrontmatter(content, filePath);
+	if (!res.ok) {
+		console.error(`[modes] ${res.error}`);
+		return undefined;
+	}
+	const def = res.def;
+	if (!def.body && !def.prompt && !def.description) return undefined;
+	if (!primaryEligible(def)) return undefined;
 
-	const { frontmatter: fm, body } = parseFrontmatter<Record<string, unknown>>(content);
-	if (!body && !fm["name"]) return undefined;
-
-	const tools = typeof fm["tools"] === "string"
-		? fm["tools"].split(",").map((t: string) => t.trim()).filter(Boolean)
-		: undefined;
-
-	const name = typeof fm["name"] === "string" && fm["name"]
-		? fm["name"]
-		: basename(filePath, ".md");
-
-	const promptMode = fm["prompt_mode"] === "replace" ? "replace" : "prepend";
+	const tools = def.tools?.kind === "csv"
+		? Array.from(def.tools.allowed)
+		: def.tools?.kind === "object"
+			? Array.from(def.tools.allowed)
+			: undefined;
 
 	return {
-		name,
-		description: typeof fm["description"] === "string" ? fm["description"] : undefined,
-		model: typeof fm["model"] === "string" ? fm["model"] : undefined,
+		name: def.name,
+		description: def.description,
+		model: def.model,
 		tools,
-		promptMode,
-		body: body.trim(),
+		promptMode: def.prompt_mode === "replace" ? "replace" : "prepend",
+		body: (def.prompt ?? def.body ?? "").trim(),
 	};
 }
 
@@ -178,6 +201,34 @@ function loadAgents(cwd: string): Map<string, AgentDefinition> {
 		for (const file of findAgentFiles(dir)) {
 			const agent = parseAgentFile(file);
 			if (agent) agents.set(agent.name, agent);
+		}
+	}
+
+	// JSON-defined agents (settings.json `agent` map) override markdown by name.
+	const settingsPaths = [
+		join(getAgentDir(), "settings.json"),
+		join(cwd, ".pi", "settings.json"),
+	];
+	for (const sp of settingsPaths) {
+		try {
+			const settings = JSON.parse(readFileSync(sp, "utf-8"));
+			const { defs, errors } = loadSettingsAgents(settings, sp);
+			for (const e of errors) console.error(`[modes] ${e}`);
+			for (const [name, def] of defs) {
+				if (!primaryEligible(def)) continue;
+				const tools = def.tools?.kind === "csv" || def.tools?.kind === "object"
+					? Array.from(def.tools.allowed) : undefined;
+				agents.set(name, {
+					name,
+					description: def.description,
+					model: def.model,
+					tools,
+					promptMode: def.prompt_mode === "replace" ? "replace" : "prepend",
+					body: (def.prompt ?? "").trim(),
+				});
+			}
+		} catch {
+			// skip
 		}
 	}
 
