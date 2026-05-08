@@ -395,9 +395,9 @@ Asserts (autonomously):
 
 **Tasks**
 
-- [ ] Implement each smoke scenario in `scripts/smoke.sh acceptance` (extend the existing smoke runner; one bash function per scenario, all called from a single `case` arm).
-- [ ] Run `bash scripts/phase8-verify.sh`. Must exit 0.
-- [ ] Update PR description with the changelog note about the `defaultAgent` → `defaultPrimaryAgent` rename and the `mode:` default flip.
+- [x] Implement each smoke scenario in `scripts/smoke.sh acceptance` (extend the existing smoke runner; one bash function per scenario, all called from a single `case` arm).
+- [x] Run `bash scripts/phase8-verify.sh`. Must exit 0.
+- [x] Update PR description with the changelog note about the `defaultAgent` → `defaultPrimaryAgent` rename and the `mode:` default flip.
 
 **Phase-local verify script (`scripts/phase8-verify.sh`)**
 

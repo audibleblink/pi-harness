@@ -1,5 +1,5 @@
 {
-  "nextId": 5,
+  "nextId": 6,
   "tasks": [
     {
       "id": "3",
@@ -30,6 +30,21 @@
       "createdAt": 1778269448532,
       "updatedAt": 1778269450539,
       "owner": "c1fe0e72-de79-4c2"
+    },
+    {
+      "id": "5",
+      "subject": "Phase 8 — full smoke + acceptance",
+      "description": "Implement Phase 8 of plan.md exactly. Phases 1-7 done (a3109ff, ed3644c, 9b38b45, 3a280f1, ac664ce, fe61adf, 72190a9). Read prd.md \"Verification\" section + plan.md \"Phase 8\" section.\n\nDeliverables:\n1. Extend `scripts/smoke.sh` with an `acceptance` case-arm that runs the 12 PRD smoke scenarios (listed verbatim in plan.md Phase 8). For each scenario, prefer a real automated check; if pi's scripted-input mechanism cannot drive a particular scenario non-interactively, fall back to a documented manual checklist line that prints clearly and contributes to a final summary. Each scenario should print PASS / SKIP(manual) / FAIL with rationale.\n\n2. `scripts/phase8-verify.sh` — wraps `scripts/smoke.sh acceptance` and asserts exit 0; also re-runs `bash scripts/check-build.sh` and `bash scripts/check-invariants.sh`.\n\n3. Update PR description / changelog note in this repo (e.g., append to AGENTS.md or a CHANGELOG.md if one exists, otherwise create a brief `CHANGELOG.md` with the migration note about: `defaultAgent` → `defaultPrimaryAgent` rename and the `mode:` default flip from absent→`subagent`-effective to absent→`all`).\n\nAcceptance:\n- `bash scripts/phase8-verify.sh` exits 0.\n- `bash scripts/check-build.sh` and `bash scripts/check-invariants.sh` exit 0.\n\nAfter green: flip plan.md Phase 8 checkboxes `- [ ]` → `- [x]`. Commit: `phase 8: full smoke + acceptance`.\n\nReport: scenarios automated vs manual, verify output, SHA. This is the final phase — migration complete.",
+      "status": "in_progress",
+      "metadata": {
+        "agentType": "general-purpose",
+        "agentId": "b3f2685e-d084-496"
+      },
+      "blocks": [],
+      "blockedBy": [],
+      "createdAt": 1778270225858,
+      "updatedAt": 1778270227980,
+      "owner": "b3f2685e-d084-496"
     }
   ]
 }
