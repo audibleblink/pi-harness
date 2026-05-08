@@ -482,6 +482,10 @@ export default function agentModeExtension(pi: ExtensionAPI) {
 	});
 
 	pi.on("session_start", async (event, ctx) => {
+		// P2 short-circuit: when extensions/agents/ is in charge, modes.ts goes inert.
+		const _settings = loadSettings(ctx.cwd) as Settings & { agents?: { enabled?: boolean } };
+		if (_settings.agents?.enabled) return;
+
 		agents = loadAgents(ctx.cwd);
 
 		// --agent flag takes highest priority

@@ -122,12 +122,12 @@ Asserts (autonomously):
 
 **Tasks**
 
-- [ ] Create `extensions/agents/{index,loader,primary,commands,cycling,bus}.ts`. Each file should remain under ~250 lines; if `primary.ts` would exceed that when porting `applyAgent`, split tool-gating into `primary-tools.ts`.
-- [ ] Add the `agents.enabled` short-circuit to `modes.ts`.
-- [ ] Update `~/.config/pi/agent/settings.json` in dev (NOT tracked) is out of scope; tracked example settings file gets a comment block documenting the flag.
-- [ ] Run `bash scripts/check-build.sh`.
-- [ ] Run `bash scripts/check-invariants.sh`.
-- [ ] Run `bash scripts/phase2-verify.sh`.
+- [x] Create `extensions/agents/{index,loader,primary,commands,cycling,bus}.ts`. Each file should remain under ~250 lines; if `primary.ts` would exceed that when porting `applyAgent`, split tool-gating into `primary-tools.ts`.
+- [x] Add the `agents.enabled` short-circuit to `modes.ts`.
+- [x] Update `~/.config/pi/agent/settings.json` in dev (NOT tracked) is out of scope; tracked example settings file gets a comment block documenting the flag.
+- [x] Run `bash scripts/check-build.sh`.
+- [x] Run `bash scripts/check-invariants.sh`.
+- [x] Run `bash scripts/phase2-verify.sh`.
 
 **Phase-local verify script (`scripts/phase2-verify.sh`)**
 
