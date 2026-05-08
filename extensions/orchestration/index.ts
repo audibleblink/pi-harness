@@ -221,12 +221,12 @@ function buildTaskPrompt(task: { id: string; subject: string; description: strin
   return prompt;
 }
 
-function loadOrchestrationSettings(): { agents?: { enabled?: boolean } } {
+function loadOrchestrationSettings(): { agents?: { enabled?: boolean }; tasks?: { enabled?: boolean } } {
   const paths = [
     join(getAgentDir(), "settings.json"),
     join(process.cwd(), ".pi", "settings.json"),
   ];
-  let merged: { agents?: { enabled?: boolean } } = {};
+  let merged: { agents?: { enabled?: boolean }; tasks?: { enabled?: boolean } } = {};
   for (const p of paths) {
     try {
       const parsed = JSON.parse(readFileSync(p, "utf-8"));
@@ -270,7 +270,7 @@ export default function (pi: ExtensionAPI) {
   let currentCtx: ExtensionContext | undefined;
 
   /** Maps agentId → taskId for O(1) completion lookup. */
-  const agentTaskMap = new Map<string, string>();
+  const agentToTaskBindings = new Map<string, string>();
 
   /** Cascade config — set by TaskExecute, consumed by completion callback. */
   let cascadeConfig: { additionalContext?: string; model?: string; maxTurns?: number } | undefined;
@@ -338,7 +338,7 @@ export default function (pi: ExtensionAPI) {
           status: a.status,
           elapsed: Date.now() - a.startedAt,
           activity: act ? describeActivity(act.activeTools, act.responseText) : "thinking…",
-          taskId: agentTaskMap.get(a.id),
+          taskId: agentToTaskBindings.get(a.id),
         };
       });
 
@@ -496,9 +496,9 @@ export default function (pi: ExtensionAPI) {
 
   const manager = new AgentManager((record) => {
     // ── Task tracking (unified from pi-tasks completion listener) ──
-    const taskId = agentTaskMap.get(record.id);
+    const taskId = agentToTaskBindings.get(record.id);
     if (taskId) {
-      agentTaskMap.delete(record.id);
+      agentToTaskBindings.delete(record.id);
       const task = store.get(taskId);
       if (task) {
         if (record.status === "stopped") {
@@ -530,7 +530,7 @@ export default function (pi: ExtensionAPI) {
                   isBackground: true,
                   maxTurns: cascadeConfig.maxTurns,
                 });
-                agentTaskMap.set(agentId, next.id);
+                agentToTaskBindings.set(agentId, next.id);
                 store.update(next.id, { owner: agentId, metadata: { ...next.metadata, agentId } });
               } catch (err: any) {
                 store.update(next.id, { status: "pending", metadata: { ...next.metadata, lastError: err.message } });
@@ -1165,6 +1165,8 @@ ${typeListText}
 
   // ===== TASK TOOLS =====
 
+  // P5 gate: skip task tool registrations when extensions/tasks/ owns them.
+  if (!settings.tasks?.enabled) {
   pi.registerTool({
     name: "TaskCreate",
     label: "TaskCreate",
@@ -1330,7 +1332,7 @@ Tasks are created with status \`pending\`. Set \`agentType\` to mark a task for 
       if (!processOutput) {
         let resolvedId = task_id;
         if (!store.get(resolvedId)) {
-          for (const [agentId, taskId] of agentTaskMap) {
+          for (const [agentId, taskId] of agentToTaskBindings) {
             if (agentId === task_id || agentId.startsWith(task_id)) { resolvedId = taskId; break; }
           }
         }
@@ -1389,7 +1391,7 @@ Tasks are created with status \`pending\`. Set \`agentType\` to mark a task for 
       if (!stopped) {
         let resolvedId = taskId;
         if (!store.get(resolvedId)) {
-          for (const [agentId, tId] of agentTaskMap) {
+          for (const [agentId, tId] of agentToTaskBindings) {
             if (agentId === taskId || agentId.startsWith(taskId)) { resolvedId = tId; break; }
           }
         }
@@ -1456,7 +1458,7 @@ Tasks are created with status \`pending\`. Set \`agentType\` to mark a task for 
             isBackground: true,
             maxTurns: p.max_turns,
           });
-          agentTaskMap.set(agentId, taskId);
+          agentToTaskBindings.set(agentId, taskId);
           store.update(taskId, { owner: agentId, metadata: { ...task.metadata, agentId } });
           launched.push(`#${taskId} → agent ${agentId}`);
         } catch (err: any) {
@@ -1487,6 +1489,7 @@ Tasks are created with status \`pending\`. Set \`agentType\` to mark a task for 
       return textResult(lines.join("\n\n"));
     },
   });
+  } // end if (!settings.tasks?.enabled) — task tools
 
   // ===== /AGENTS COMMAND =====
 
@@ -2030,6 +2033,7 @@ ${systemPrompt}
 
   // ===== /TASKS COMMAND =====
 
+  if (!settings.tasks?.enabled) {
   pi.registerCommand("tasks", {
     description: "Manage tasks — view, create, clear completed",
     handler: async (_args: string, ctx: ExtensionCommandContext) => {
@@ -2143,4 +2147,5 @@ ${systemPrompt}
       await mainMenu();
     },
   });
+  } // end if (!settings.tasks?.enabled) — /tasks command
 }

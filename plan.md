@@ -260,10 +260,10 @@ Asserts (autonomously):
 
 **Tasks**
 
-- [ ] Port `TaskStore` and `auto-clear` verbatim into `extensions/tasks/`.
-- [ ] Create one tool file per Task* tool; each file ≤120 lines.
-- [ ] Add the conditional skip in `orchestration/index.ts`.
-- [ ] Run `bash scripts/check-build.sh`, `bash scripts/check-invariants.sh`, `bash scripts/phase5-verify.sh`.
+- [x] Port `TaskStore` and `auto-clear` verbatim into `extensions/tasks/`.
+- [x] Create one tool file per Task* tool; each file ≤120 lines.
+- [x] Add the conditional skip in `orchestration/index.ts`.
+- [x] Run `bash scripts/check-build.sh`, `bash scripts/check-invariants.sh`, `bash scripts/phase5-verify.sh`.
 
 **Phase-local verify script (`scripts/phase5-verify.sh`)**
 
