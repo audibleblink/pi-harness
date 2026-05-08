@@ -294,10 +294,10 @@ Asserts (autonomously):
 
 **Tasks**
 
-- [ ] Implement `cascade.ts`; delete `cascade-stub.ts`.
-- [ ] Guard `orchestration/`'s cascade subscription behind `!settings.tasks?.enabled`.
-- [ ] Verify `agentTaskMap` invariant still passes (must be in exactly one file — `extensions/tasks/store.ts`).
-- [ ] Run `bash scripts/check-build.sh`, `bash scripts/check-invariants.sh`, `bash scripts/phase6-verify.sh`.
+- [x] Implement `cascade.ts`; delete `cascade-stub.ts`.
+- [x] Guard `orchestration/`'s cascade subscription behind `!settings.tasks?.enabled`.
+- [x] Verify `agentTaskMap` invariant still passes (must be in exactly one file — `extensions/tasks/store.ts`).
+- [x] Run `bash scripts/check-build.sh`, `bash scripts/check-invariants.sh`, `bash scripts/phase6-verify.sh`.
 
 **Phase-local verify script (`scripts/phase6-verify.sh`)**
 

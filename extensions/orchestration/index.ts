@@ -496,7 +496,10 @@ export default function (pi: ExtensionAPI) {
 
   const manager = new AgentManager((record) => {
     // ── Task tracking (unified from pi-tasks completion listener) ──
-    const taskId = agentToTaskBindings.get(record.id);
+    // P6 guard: when extensions/tasks/ owns tasks, its cascade.ts subscriber
+    // handles task status + cascade via agents:subagent_end. Skip here to
+    // prevent double-fire even though our task tools and bindings are inert.
+    const taskId = settings.tasks?.enabled ? undefined : agentToTaskBindings.get(record.id);
     if (taskId) {
       agentToTaskBindings.delete(record.id);
       const task = store.get(taskId);

@@ -1,5 +1,5 @@
 {
-  "nextId": 4,
+  "nextId": 5,
   "tasks": [
     {
       "id": "3",
@@ -15,6 +15,21 @@
       "createdAt": 1778268001873,
       "updatedAt": 1778268004020,
       "owner": "3ede18cb-8cbf-446"
+    },
+    {
+      "id": "4",
+      "subject": "Phase 6 — cascade event wiring",
+      "description": "Implement Phase 6 of plan.md exactly. Phases 1-5 done (a3109ff, ed3644c, 9b38b45, 3a280f1, ac664ce). Read prd.md + plan.md \"Phase 6\" section.\n\nDeliverables:\n1. Replace `extensions/tasks/cascade-stub.ts` with `extensions/tasks/cascade.ts`:\n   - Subscribes to `agents:subagent_end`.\n   - On event, looks up task by `agentId` via TaskStore's agentTaskMap (`getTaskByAgent` helper). Ensure `TaskExecute` populates the binding when spawning.\n   - If found and event status is terminal (success/failure/stopped), mark task completed and trigger same cascade rules as orchestration today (release tasks blocked by this one).\n2. Remove cascade subscription from `orchestration/index.ts` when `tasks.enabled` is true. Explicitly guard against double-fire even if its tools are skipped.\n3. agentTaskMap remains in exactly one file (`extensions/tasks/store.ts`). The existing invariants script must still pass.\n4. NO cross-extension imports between `agents/` and `tasks/` — wiring is purely via the event bus.\n\n`scripts/phase6-verify.sh` per plan:\n1. `rg -l \"agentTaskMap\" extensions/` returns exactly 1 path (extensions/tasks/store.ts).\n2. `rg -n \"agents:subagent_end\" extensions/tasks/cascade.ts` ≥ 1.\n3. `rg -n \"cascade-stub\" extensions/` returns 0.\n4. Smoke: minimal arm or documented manual checklist exiting 0.\n5. check-build + check-invariants exit 0.\n\nAcceptance: all three scripts exit 0.\n\nAfter green: flip plan.md Phase 6 checkboxes. Commit: `phase 6: cascade event wiring (agents → tasks)`.\n\nReport: files, verify output, SHA. Do NOT proceed to Phase 7.",
+      "status": "in_progress",
+      "metadata": {
+        "agentType": "general-purpose",
+        "agentId": "c1fe0e72-de79-4c2"
+      },
+      "blocks": [],
+      "blockedBy": [],
+      "createdAt": 1778269448532,
+      "updatedAt": 1778269450539,
+      "owner": "c1fe0e72-de79-4c2"
     }
   ]
 }

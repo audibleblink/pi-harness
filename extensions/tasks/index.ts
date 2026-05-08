@@ -16,7 +16,7 @@ import { getAgentDir } from "@mariozechner/pi-coding-agent";
 import { publishOrchestration } from "../ui/bus.js";
 import type { OrchestrationState } from "../ui/bus.js";
 import { AutoClearManager } from "./auto-clear.js";
-import { registerCascadeStub } from "./cascade-stub.js";
+import { registerCascade } from "./cascade.js";
 import { TaskStore } from "./store.js";
 import type { TaskDeps } from "./tools/deps.js";
 import { register as registerCreate } from "./tools/create.js";
@@ -84,7 +84,6 @@ export default function (pi: ExtensionAPI) {
   let currentTurn = 0;
   let storeUpgraded = false;
   let cascadeConfig: { additionalContext?: string; model?: string; maxTurns?: number } | undefined;
-  void cascadeConfig; // P6 will read this from cascade.ts
 
   function upgradeStoreIfNeeded(ctx: ExtensionContext) {
     if (storeUpgraded) return;
@@ -140,7 +139,15 @@ export default function (pi: ExtensionAPI) {
   registerStop(pi, deps);
   registerExecute(pi, deps);
 
-  registerCascadeStub(pi);
+  registerCascade(pi, {
+    getStore: () => store,
+    autoClear,
+    getCurrentTurn: () => currentTurn,
+    schedulePublish,
+    spawn,
+    getCascadeConfig: () => cascadeConfig,
+    getAutoCascade: () => cfg.autoCascade ?? false,
+  });
 
   // ===== SESSION LIFECYCLE =====
 
