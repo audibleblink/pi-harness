@@ -25,6 +25,10 @@ import { registerCommands } from "./commands.js";
 import { registerCycling } from "./cycling.js";
 import { createSubagentRuntime } from "./subagent-runner.js";
 import { registerSubagentTools } from "./subagent-tools.js";
+import { extractAtDispatches } from "./at-dispatch.js";
+import { createAgentAtAutocompleteFactory } from "./at-autocomplete.js";
+import { dispatchSpawn, PERMISSION_ASK_EVENT, type PermissionAskPayload } from "./spawn.js";
+import type { AgentDef } from "../_agent-schema/types.js";
 
 interface Settings {
 	defaultPrimaryAgent?: string;
@@ -62,6 +66,7 @@ export default function agentsExtension(pi: ExtensionAPI) {
 		originalState: undefined,
 		lastWrittenAgentName: undefined,
 	};
+	let allDefs: Map<string, AgentDef> = new Map();
 
 	pi.registerFlag("agent", { description: "Default agent to use at startup", type: "string" });
 
@@ -70,7 +75,7 @@ export default function agentsExtension(pi: ExtensionAPI) {
 
 	// Subagent tools (Agent, get_subagent_result, steer_subagent) + lifecycle.
 	const subagentRuntime = createSubagentRuntime(pi);
-	registerSubagentTools(pi, subagentRuntime);
+	registerSubagentTools(pi, subagentRuntime, () => state.activeAgent?.permission);
 
 	pi.on("session_shutdown", async () => {
 		subagentRuntime.dispose();
@@ -99,9 +104,12 @@ export default function agentsExtension(pi: ExtensionAPI) {
 		subagentRuntime.manager.clearCompleted();
 		subagentRuntime.schedulePublish();
 
-		const { agents, errors } = loadAgents(ctx.cwd);
+		const { agents, defs, errors } = loadAgents(ctx.cwd);
 		state.agents = agents;
+		allDefs = defs;
 		for (const e of errors) console.error(`[agents] ${e}`);
+
+		ctx.ui.addAutocompleteProvider(createAgentAtAutocompleteFactory(() => allDefs));
 
 		const agentFlag = pi.getFlag("agent");
 		if (typeof agentFlag === "string" && agentFlag) {
@@ -138,6 +146,52 @@ export default function agentsExtension(pi: ExtensionAPI) {
 		}
 
 		updateStatus(pi, state);
+	});
+
+	// @-mention dispatch: rewrite user input, spawn one subagent per match.
+	pi.on("input", async (event, ctx) => {
+		if (event.source !== "interactive" && event.source !== "rpc") return;
+		const { strippedMessage, dispatches } = extractAtDispatches(event.text, allDefs);
+		if (dispatches.length === 0) return;
+
+		const invokerPermission = state.activeAgent?.permission;
+
+		// Fire spawns asynchronously after the input event resolves so we don't
+		// block input handling.
+		setImmediate(async () => {
+			for (const d of dispatches) {
+				if (d.rejected === "primary-only") {
+					console.error(`[agents] @${d.name}: rejected — agent is primary-only (cannot dispatch as subagent)`);
+					ctx.ui.notify(`@${d.name}: cannot dispatch — agent is primary-only`, "warning");
+					continue;
+				}
+				const result = await dispatchSpawn(
+					{
+						invokerPermission,
+						emitAsk: (payload: PermissionAskPayload) => pi.events.emit(PERMISSION_ASK_EVENT, payload),
+						performSpawn: async (name, prompt) => {
+							try {
+								const id = subagentRuntime.spawn(name, prompt, { isBackground: true });
+								return { agentId: id };
+							} catch (e) {
+								return { error: e instanceof Error ? e.message : String(e) };
+							}
+						},
+					},
+					d.name,
+					strippedMessage,
+				);
+				if (result.kind === "denied") {
+					console.error(`[agents] @${d.name}: rejected — task-permission-denied`);
+					ctx.ui.notify(`@${d.name}: rejected by permission.task`, "warning");
+				} else if (result.kind === "error") {
+					console.error(`[agents] @${d.name}: ${result.message}`);
+					ctx.ui.notify(`@${d.name}: ${result.message}`, "error");
+				}
+			}
+		});
+
+		return { action: "transform", text: strippedMessage, images: event.images };
 	});
 
 	pi.on("turn_start", async () => {

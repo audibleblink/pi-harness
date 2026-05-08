@@ -21,7 +21,7 @@ import { fileURLToPath } from "node:url";
 import { getAgentDir } from "@mariozechner/pi-coding-agent";
 import { parseAgentFrontmatter } from "../_agent-schema/parse-frontmatter.js";
 import { loadSettingsAgents } from "../_agent-schema/load-settings-agents.js";
-import type { AgentDef } from "../_agent-schema/types.js";
+import type { AgentDef, PermissionMap } from "../_agent-schema/types.js";
 
 export interface AgentDefinition {
 	name: string;
@@ -30,10 +30,12 @@ export interface AgentDefinition {
 	tools?: string[];
 	promptMode?: "replace" | "prepend";
 	body: string;
+	permission?: PermissionMap;
 }
 
 export interface LoadResult {
 	agents: Map<string, AgentDefinition>;
+	defs: Map<string, AgentDef>;
 	errors: string[];
 }
 
@@ -88,11 +90,13 @@ function defToDefinition(name: string, def: AgentDef): AgentDefinition {
 		tools,
 		promptMode: def.prompt_mode === "replace" ? "replace" : "prepend",
 		body: (def.prompt ?? def.body ?? "").trim(),
+		permission: def.permission,
 	};
 }
 
 export function loadAgents(cwd: string): LoadResult {
 	const agents = new Map<string, AgentDefinition>();
+	const defs = new Map<string, AgentDef>();
 	const errors: string[] = [];
 
 	const globalDir = join(getAgentDir(), "agents");
@@ -107,6 +111,7 @@ export function loadAgents(cwd: string): LoadResult {
 			try { raw = readFileSync(file, "utf-8"); } catch { continue; }
 			const res = parseAgentFrontmatter(raw, file);
 			if (!res.ok) { errors.push(res.error); continue; }
+			if (res.def.disable !== true) defs.set(res.def.name, res.def);
 			if (!primaryEligible(res.def)) continue;
 			if (!res.def.body && !res.def.prompt && !res.def.description) continue;
 			agents.set(res.def.name, defToDefinition(res.def.name, res.def));
@@ -121,13 +126,14 @@ export function loadAgents(cwd: string): LoadResult {
 	for (const sp of settingsPaths) {
 		let parsed: unknown;
 		try { parsed = JSON.parse(readFileSync(sp, "utf-8")); } catch { continue; }
-		const { defs, errors: errs } = loadSettingsAgents(parsed, sp);
+		const { defs: jsonDefs, errors: errs } = loadSettingsAgents(parsed, sp);
 		for (const e of errs) errors.push(e);
-		for (const [name, def] of defs) {
+		for (const [name, def] of jsonDefs) {
+			if (def.disable !== true) defs.set(name, def);
 			if (!primaryEligible(def)) continue;
 			agents.set(name, defToDefinition(name, def));
 		}
 	}
 
-	return { agents, errors };
+	return { agents, defs, errors };
 }

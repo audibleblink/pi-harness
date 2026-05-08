@@ -212,7 +212,7 @@ Asserts (autonomously):
 
 **Tasks**
 
-- [ ] Implement `extractAtDispatches` with table-driven unit tests in `scripts/phase4-verify.sh` (tsx harness):
+- [x] Implement `extractAtDispatches` with table-driven unit tests in `scripts/phase4-verify.sh` (tsx harness):
   - `@alice hi` (alice is subagent) → 1 dispatch, prompt `"hi"`.
   - `hi @alice there` → 1 dispatch, prompt `"hi there"`.
   - `@alice and @bob` (both subagents) → 2 dispatches, prompt `"and"`.
@@ -223,11 +223,11 @@ Asserts (autonomously):
   - `@primaryOnly hi` (primary-only) → 1 rejected dispatch (`primary-only`), no spawn, error surfaced.
   - `@hiddenSub hi` (subagent, `hidden: true`) → 1 dispatch, prompt `"hi"` (hidden does not block dispatch).
   - `@allMode hi` (`mode: all`) → 1 dispatch (all is subagent-eligible).
-- [ ] Implement `at-autocomplete.ts` and verify it excludes `hidden: true`, `disable: true`, and `mode: primary` agents.
-- [ ] Implement `permission.task` enforcement in the shared `spawn` helper; cover ask/allow/deny via `checkPermission`.
-- [ ] Wire the dispatcher into the user-message-submit hook of `extensions/agents/index.ts`.
-- [ ] Factor a single `spawn(name, prompt, opts)` helper used by both `Agent` tool and `@name` dispatch.
-- [ ] Run `bash scripts/check-build.sh`, `bash scripts/check-invariants.sh`, `bash scripts/phase4-verify.sh`.
+- [x] Implement `at-autocomplete.ts` and verify it excludes `hidden: true`, `disable: true`, and `mode: primary` agents.
+- [x] Implement `permission.task` enforcement in the shared `spawn` helper; cover ask/allow/deny via `checkPermission`.
+- [x] Wire the dispatcher into the user-message-submit hook of `extensions/agents/index.ts`.
+- [x] Factor a single `spawn(name, prompt, opts)` helper used by both `Agent` tool and `@name` dispatch.
+- [x] Run `bash scripts/check-build.sh`, `bash scripts/check-invariants.sh`, `bash scripts/phase4-verify.sh`.
 
 **Phase-local verify script (`scripts/phase4-verify.sh`)**
 

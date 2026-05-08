@@ -42,6 +42,8 @@ import { resolveModel } from "../orchestration/model-resolver.js";
 import { createOutputFilePath, streamToOutputFile, writeInitialEntry } from "../orchestration/output-file.js";
 import type { SubagentType } from "../orchestration/types.js";
 import type { SubagentRuntime } from "./subagent-runner.js";
+import type { PermissionMap } from "../_agent-schema/types.js";
+import { checkTaskPermission, PERMISSION_ASK_EVENT } from "./spawn.js";
 
 function textResult(msg: string, details?: AgentDetails) {
 	return { content: [{ type: "text" as const, text: msg }], details: details as any };
@@ -148,7 +150,11 @@ function buildTypeListText(): string {
 	].join("\n");
 }
 
-export function registerSubagentTools(pi: ExtensionAPI, runtime: SubagentRuntime): void {
+export function registerSubagentTools(
+	pi: ExtensionAPI,
+	runtime: SubagentRuntime,
+	getInvokerPermission: () => PermissionMap | undefined = () => undefined,
+): void {
 	const reloadCustomAgents = () => {
 		const userAgents = loadCustomAgents(process.cwd());
 		registerAgents(userAgents);
@@ -262,6 +268,16 @@ ${typeListText}
 			const resolved = resolveType(rawType);
 			const subagentType = resolved ?? "general-purpose";
 			const fellBack = resolved === undefined;
+
+			// permission.task enforcement (Phase 4) — invoker = active primary.
+			const permAction = checkTaskPermission(getInvokerPermission(), subagentType);
+			if (permAction === "deny") {
+				return textResult(`Refused: permission.task denies spawning subagent "${subagentType}".`);
+			}
+			if (permAction === "ask") {
+				pi.events.emit(PERMISSION_ASK_EVENT, { subagentName: subagentType, prompt: p.prompt });
+				return textResult(`Refused: permission.task requires user confirmation to spawn subagent "${subagentType}". (ask flow not yet interactive)`);
+			}
 
 			const displayName = getDisplayName(subagentType);
 			const customConfig = getAgentConfig(subagentType);
