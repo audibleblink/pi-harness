@@ -160,12 +160,12 @@ Asserts (autonomously):
 
 **Tasks**
 
-- [ ] Port the three tool registrations into `subagent-tools.ts` (signatures and Typebox schemas verbatim from current `orchestration/index.ts`).
-- [ ] Add the conditional skip in `orchestration/index.ts`.
-- [ ] Wire `subagent-bus.ts` calls at the same publish points the orchestration extension uses today.
-- [ ] Add `lifecycle-events.ts` and emit `agents:subagent_end` from the runner completion path (in `subagent-runner.ts`'s wrapper) on success, failure, and stop.
-- [ ] Update `scripts/check-invariants.sh` allowed-events to include `agents:subagent_end`.
-- [ ] Run `bash scripts/check-build.sh`, `bash scripts/check-invariants.sh`, `bash scripts/phase3-verify.sh`.
+- [x] Port the three tool registrations into `subagent-tools.ts` (signatures and Typebox schemas verbatim from current `orchestration/index.ts`).
+- [x] Add the conditional skip in `orchestration/index.ts`.
+- [x] Wire `subagent-bus.ts` calls at the same publish points the orchestration extension uses today.
+- [x] Add `lifecycle-events.ts` and emit `agents:subagent_end` from the runner completion path (in `subagent-runner.ts`'s wrapper) on success, failure, and stop.
+- [x] Update `scripts/check-invariants.sh` allowed-events to include `agents:subagent_end`.
+- [x] Run `bash scripts/check-build.sh`, `bash scripts/check-invariants.sh`, `bash scripts/phase3-verify.sh`.
 
 **Phase-local verify script (`scripts/phase3-verify.sh`)**
 

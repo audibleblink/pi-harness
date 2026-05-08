@@ -12,6 +12,7 @@
 import { existsSync, mkdirSync, readFileSync, unlinkSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import { getAgentDir } from "@mariozechner/pi-coding-agent";
 import { Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import { AgentManager } from "./agent-manager.js";
@@ -220,7 +221,25 @@ function buildTaskPrompt(task: { id: string; subject: string; description: strin
   return prompt;
 }
 
+function loadOrchestrationSettings(): { agents?: { enabled?: boolean } } {
+  const paths = [
+    join(getAgentDir(), "settings.json"),
+    join(process.cwd(), ".pi", "settings.json"),
+  ];
+  let merged: { agents?: { enabled?: boolean } } = {};
+  for (const p of paths) {
+    try {
+      const parsed = JSON.parse(readFileSync(p, "utf-8"));
+      merged = { ...merged, ...parsed };
+    } catch { /* skip */ }
+  }
+  return merged;
+}
+
 export default function (pi: ExtensionAPI) {
+
+  // P3: when extensions/agents/ owns subagent tools, orchestration/ skips them.
+  const settings = loadOrchestrationSettings();
 
   // ===== TASK STATE =====
 
@@ -750,6 +769,8 @@ export default function (pi: ExtensionAPI) {
 
   // ===== AGENT TOOL =====
 
+  // P3 gate: skip subagent tool registrations when extensions/agents/ owns them.
+  if (!settings.agents?.enabled) {
   pi.registerTool<any, AgentDetails>({
     name: "Agent",
     label: "Agent",
@@ -1140,6 +1161,7 @@ ${typeListText}
       }
     },
   });
+  } // end if (!settings.agents?.enabled)
 
   // ===== TASK TOOLS =====
 

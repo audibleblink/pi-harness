@@ -5,7 +5,7 @@
  */
 
 import { basename } from "node:path";
-import { parse as parseYaml } from "yaml";
+import { parseFrontmatter as parseFm } from "@mariozechner/pi-coding-agent";
 import { applyAliases, DEFAULT_MODE } from "./defaults.js";
 import { normalizePermission } from "./permission.js";
 import { resolvePrompt } from "./prompt-resolver.js";
@@ -14,20 +14,8 @@ import type { AgentDef, AgentMode, ParseResult } from "./types.js";
 
 const VALID_MODES: ReadonlySet<AgentMode> = new Set(["primary", "subagent", "all"]);
 
-/** Inline YAML frontmatter splitter (no dependency on pi-coding-agent at parse time). */
-function readFrontmatter(raw: string): { frontmatter: Record<string, unknown>; body: string } {
-	const normalized = raw.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-	if (!normalized.startsWith("---")) return { frontmatter: {}, body: normalized };
-	const end = normalized.indexOf("\n---", 3);
-	if (end === -1) return { frontmatter: {}, body: normalized };
-	const yamlString = normalized.slice(4, end);
-	const body = normalized.slice(end + 4).trim();
-	const parsed = parseYaml(yamlString) ?? {};
-	return { frontmatter: parsed as Record<string, unknown>, body };
-}
-
 export function parseAgentFrontmatter(raw: string, sourcePath: string): ParseResult {
-	const { frontmatter, body } = readFrontmatter(raw);
+	const { frontmatter, body } = parseFm<Record<string, unknown>>(raw);
 	const name = (typeof frontmatter["name"] === "string" && frontmatter["name"]) as string
 		|| basename(sourcePath, ".md");
 	return finalize(name, frontmatter, body, sourcePath);

@@ -27,6 +27,10 @@ check "setEditorComponent outside ui/" "$(rg -l 'setEditorComponent\(' extension
 # DoD #2: No bare subagents:* event names (in emit/on calls, not comments)
 check "subagents: event names in emit/on" "$(rg -c "(emit|on)\(['\"]subagents:" extensions/ -g '*.ts' 2>/dev/null | wc -l | tr -d ' ')" "0"
 
+# Allowed event names (P3 introduces agents:subagent_end emitted by extensions/agents/).
+# Keep this list current; new event names must be added explicitly.
+# Allowed: agents:subagent_end
+
 # DoD #3: Symbol.for pi-subagents
 check "Symbol.for pi-subagents" "$(rg -l 'Symbol\.for\("pi-subagents:' extensions/ -g '*.ts' 2>/dev/null | wc -l | tr -d ' ')" "0"
 

@@ -23,6 +23,8 @@ import {
 } from "./primary.js";
 import { registerCommands } from "./commands.js";
 import { registerCycling } from "./cycling.js";
+import { createSubagentRuntime } from "./subagent-runner.js";
+import { registerSubagentTools } from "./subagent-tools.js";
 
 interface Settings {
 	defaultPrimaryAgent?: string;
@@ -47,6 +49,13 @@ function loadSettings(cwd: string): Settings {
 }
 
 export default function agentsExtension(pi: ExtensionAPI) {
+	// Load-time gate: while agents.enabled is off, the legacy modes.ts owns
+	// primary-mode behavior (including the --agent flag, /agent[s] commands,
+	// and Tab/Ctrl+Shift+M cycling). Stay completely inert to avoid duplicate
+	// registrations.
+	const bootSettings = loadSettings(process.cwd());
+	if (!bootSettings.agents?.enabled) return;
+
 	const state: AgentsState = {
 		agents: new Map(),
 		activeAgent: undefined,
@@ -58,6 +67,19 @@ export default function agentsExtension(pi: ExtensionAPI) {
 
 	registerCommands(pi, state);
 	registerCycling(pi, state);
+
+	// Subagent tools (Agent, get_subagent_result, steer_subagent) + lifecycle.
+	const subagentRuntime = createSubagentRuntime(pi);
+	registerSubagentTools(pi, subagentRuntime);
+
+	pi.on("session_shutdown", async () => {
+		subagentRuntime.dispose();
+	});
+
+	pi.on("tool_execution_start", async (_event, ctx) => {
+		subagentRuntime.setCurrentCtx(ctx);
+		subagentRuntime.schedulePublish();
+	});
 
 	pi.on("before_agent_start", async (event) => {
 		if (state.activeAgent?.body) {
@@ -72,6 +94,10 @@ export default function agentsExtension(pi: ExtensionAPI) {
 	pi.on("session_start", async (event, ctx) => {
 		const settings = loadSettings(ctx.cwd);
 		if (!settings.agents?.enabled) return; // P2: opt-in only
+
+		subagentRuntime.setCurrentCtx(ctx);
+		subagentRuntime.manager.clearCompleted();
+		subagentRuntime.schedulePublish();
 
 		const { agents, errors } = loadAgents(ctx.cwd);
 		state.agents = agents;
