@@ -29,6 +29,7 @@ import {
 	type Skill,
 } from "@mariozechner/pi-coding-agent";
 import { Container, matchesKey, type SelectItem, SelectList, Text } from "@mariozechner/pi-tui";
+import { SLOT_AGENT_SKILLS, UI_BUS_TOPIC, type UiBusEnvelope } from "./ui/bus.js";
 
 interface SettingsShape {
 	autoSkills?: string[];
@@ -39,7 +40,16 @@ const SETTING_KEY = "autoSkills";
 
 export default function (pi: ExtensionAPI) {
 	let visibleSet = new Set<string>();
+	let agentOverride: Set<string> | null = null;
 	let knownSkills: Skill[] = [];
+
+	pi.events.on(UI_BUS_TOPIC, (data: unknown) => {
+		const env = data as UiBusEnvelope;
+		if (env?.slot !== SLOT_AGENT_SKILLS) return;
+		agentOverride = Array.isArray(env.value)
+			? new Set(env.value.filter((v): v is string => typeof v === "string"))
+			: null;
+	});
 
 	function settingsPath(): string {
 		return join(getAgentDir(), "settings.json");
@@ -86,9 +96,11 @@ export default function (pi: ExtensionAPI) {
 		const original = formatSkillsForPrompt(skills);
 		if (!original) return;
 
-		// Hide every skill NOT in the allowlist.
+		// Hide every skill NOT in the allowlist. Active primary agent (if any)
+		// overrides the persisted set for the duration it's active.
+		const effective = agentOverride ?? visibleSet;
 		const filtered = skills.map((s) =>
-			visibleSet.has(s.name) ? s : { ...s, disableModelInvocation: true },
+			effective.has(s.name) ? s : { ...s, disableModelInvocation: true },
 		);
 		const replacement = formatSkillsForPrompt(filtered);
 

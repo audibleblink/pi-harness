@@ -95,11 +95,12 @@ export default function sessionMarkdownEditor(pi: ExtensionAPI) {
 				const agentEntry = ctx.sessionManager
 					.getEntries()
 					.filter((e: any) => e.type === "custom" && e.customType === "agent-state")
-					.pop() as { data?: { name: string } } | undefined;
+					.pop() as { data?: { name: string | null } } | undefined;
 
 				const result = await ctx.newSession({
 					parentSession,
 					setup: async (sm) => {
+						// null sentinel == explicitly cleared; do not carry forward.
 						if (agentEntry?.data?.name) sm.appendCustomEntry("agent-state", { name: agentEntry.data.name });
 						for (const message of messages) sm.appendMessage(toAgentMessage(message));
 					},
