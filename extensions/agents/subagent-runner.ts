@@ -52,8 +52,9 @@ function safeFormatTokens(session: { getSessionStats(): { tokens: { total: numbe
 	}
 }
 
-function escapeXml(s: string): string {
-	return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+function escapeXml(s: string | undefined | null): string {
+	if (s == null) return "";
+	return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 function getStatusLabel(status: string, error?: string): string {

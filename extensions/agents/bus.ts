@@ -5,4 +5,4 @@
  * publishMode here so there is exactly one producer call site.
  */
 
-export { publishMode } from "../ui/bus.js";
+export { publishAgentSkills, publishMode } from "../ui/bus.js";

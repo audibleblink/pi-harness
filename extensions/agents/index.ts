@@ -110,13 +110,20 @@ export default function agentsExtension(pi: ExtensionAPI) {
 			const entry = entries
 				.filter((e: { type: string; customType?: string }) =>
 					e.type === "custom" && e.customType === AGENT_STATE_ENTRY_TYPE)
-				.pop() as { data?: { name: string } } | undefined;
-			if (entry?.data?.name) {
-				const a = agents.get(entry.data.name);
-				if (a) {
-					state.activeAgent = a;
+				.pop() as { data?: { name: string | null } } | undefined;
+			if (entry) {
+				// null sentinel == explicitly cleared; leave activeAgent undefined.
+				if (entry.data?.name === null) {
 					updateStatus(pi, state);
 					return;
+				}
+				if (entry.data?.name) {
+					const a = agents.get(entry.data.name);
+					if (a) {
+						state.activeAgent = a;
+						updateStatus(pi, state);
+						return;
+					}
 				}
 			}
 		}
@@ -156,7 +163,8 @@ export default function agentsExtension(pi: ExtensionAPI) {
 						emitAsk: (payload: PermissionAskPayload) => pi.events.emit(PERMISSION_ASK_EVENT, payload),
 						performSpawn: async (name, prompt) => {
 							try {
-								const id = subagentRuntime.spawn(name, prompt, { isBackground: true });
+								const description = allDefs.get(name)?.description ?? `@${name}`;
+								const id = subagentRuntime.spawn(name, prompt, { isBackground: true, description });
 								return { agentId: id };
 							} catch (e) {
 								return { error: e instanceof Error ? e.message : String(e) };

@@ -26,6 +26,8 @@ export interface AgentDefinition {
 	promptMode?: "replace" | "prepend";
 	body: string;
 	permission?: PermissionMap;
+	/** Explicit skill allowlist for primary mode (subagent path uses agent-runner separately). */
+	skills?: string[];
 }
 
 export interface LoadResult {
@@ -35,15 +37,20 @@ export interface LoadResult {
 }
 
 function findExtensionPackageRoot(): string | undefined {
-	let dir: string;
+	let loaderDir: string;
 	try {
-		dir = dirname(fileURLToPath(import.meta.url));
+		loaderDir = dirname(fileURLToPath(import.meta.url));
 	} catch {
 		return undefined;
 	}
+	// Loader lives at <root>/extensions/agents/loader.ts — walk up, but ignore the
+	// loader's own `agents/` directory when probing for a sibling agents/ folder.
+	let dir = loaderDir;
 	let prev = "";
 	while (dir && dir !== prev) {
-		if (existsSync(join(dir, "package.json")) || existsSync(join(dir, "agents"))) return dir;
+		if (existsSync(join(dir, "package.json"))) return dir;
+		const candidate = join(dir, "agents");
+		if (candidate !== loaderDir && existsSync(candidate)) return dir;
 		prev = dir;
 		dir = dirname(dir);
 	}
@@ -71,6 +78,18 @@ function primaryEligible(def: AgentDef): boolean {
 	return def.mode === "primary" || def.mode === "all";
 }
 
+function parseSkillsAllowlist(val: unknown): string[] | undefined {
+	if (Array.isArray(val)) {
+		const items = val.filter((v): v is string => typeof v === "string");
+		return items.length ? items : undefined;
+	}
+	if (typeof val === "string" && val !== "none") {
+		const items = val.split(",").map((s) => s.trim()).filter(Boolean);
+		return items.length ? items : undefined;
+	}
+	return undefined; // true/false/missing => no override
+}
+
 function defToDefinition(name: string, def: AgentDef): AgentDefinition {
 	const tools = def.tools?.kind === "csv" || def.tools?.kind === "object"
 		? Array.from(def.tools.allowed)
@@ -83,6 +102,7 @@ function defToDefinition(name: string, def: AgentDef): AgentDefinition {
 		promptMode: def.prompt_mode === "replace" ? "replace" : "prepend",
 		body: (def.prompt ?? def.body ?? "").trim(),
 		permission: def.permission,
+		skills: parseSkillsAllowlist(def.skills),
 	};
 }
 

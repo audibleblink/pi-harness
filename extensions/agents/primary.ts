@@ -9,7 +9,7 @@
 import type { Api, Model } from "@mariozechner/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import type { AgentDefinition } from "./loader.js";
-import { publishMode } from "./bus.js";
+import { publishAgentSkills, publishMode } from "./bus.js";
 
 export interface OriginalState {
 	model: Model<Api> | undefined;
@@ -66,6 +66,7 @@ export async function applyAgent(
 	}
 
 	state.activeAgent = agent;
+	publishAgentSkills(pi, agent.skills ?? null);
 }
 
 export async function clearAgent(
@@ -73,12 +74,17 @@ export async function clearAgent(
 	state: AgentsState,
 	ctx: ExtensionContext,
 ): Promise<void> {
+	const hadAgent = state.activeAgent !== undefined;
 	state.activeAgent = undefined;
 	state.lastWrittenAgentName = undefined;
 	if (state.originalState) {
 		if (state.originalState.model) await pi.setModel(state.originalState.model);
 		pi.setActiveTools(state.originalState.tools);
 	}
+	publishAgentSkills(pi, null);
+	// Persist a sentinel so resume/fork/new restoration knows the user explicitly
+	// cleared. Without this, the last `agent-state` entry would be re-applied stale.
+	if (hadAgent) pi.appendEntry(AGENT_STATE_ENTRY_TYPE, { name: null });
 	ctx.ui.notify("Agent cleared, defaults restored", "info");
 	updateStatus(pi, state);
 }

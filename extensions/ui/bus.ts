@@ -20,6 +20,7 @@ export const SLOT_WORKING = "working";
 export const SLOT_SUBAGENT_USAGE = "subagentUsage";
 export const SLOT_GHOST = "ghost";
 export const SLOT_BLUR = "blur";
+export const SLOT_AGENT_SKILLS = "agentSkills";
 
 // ─── Envelope ─────────────────────────────────────────────────────────────────
 
@@ -97,4 +98,9 @@ export function publishGhost(pi: ExtensionAPI, controller: GhostController | nul
 
 export function publishBlur(pi: ExtensionAPI, blurred: boolean): void {
 	pi.events.emit(UI_BUS_TOPIC, { slot: SLOT_BLUR, value: blurred } satisfies UiBusEnvelope);
+}
+
+/** Primary-agent skill allowlist override (null = no override; use persisted visible set). */
+export function publishAgentSkills(pi: ExtensionAPI, allowlist: string[] | null): void {
+	pi.events.emit(UI_BUS_TOPIC, { slot: SLOT_AGENT_SKILLS, value: allowlist } satisfies UiBusEnvelope);
 }

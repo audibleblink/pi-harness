@@ -44,8 +44,6 @@ async function switch_agent(pi: ExtensionAPI, state: AgentsState, ctx: Extension
 
 export function registerCycling(pi: ExtensionAPI, state: AgentsState): void {
 	const handler = (ctx: ExtensionContext) => switch_agent(pi, state, ctx);
-	// Tab — opencode parity. key: "Tab"
-	pi.registerShortcut(Key.tab, { description: "switch_agent (Tab)", handler });
-	// Legacy alias.
+	// Tab is reserved for editor (ghost-completion accept, slash-command autocomplete).
 	pi.registerShortcut(Key.ctrlShift("m"), { description: "switch_agent (Ctrl+Shift+M)", handler });
 }
