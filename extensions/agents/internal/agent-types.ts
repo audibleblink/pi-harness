@@ -15,7 +15,6 @@ import {
   createReadTool,
   createWriteTool,
 } from "@mariozechner/pi-coding-agent";
-import { DEFAULT_AGENTS } from "./default-agents.js";
 import type { AgentConfig } from "./types.js";
 
 type ToolFactory = (cwd: string) => AgentTool<any>;
@@ -38,18 +37,10 @@ const agents = new Map<string, AgentConfig>();
 
 /**
  * Register agents into the unified registry.
- * Starts with DEFAULT_AGENTS, then overlays user agents (overrides defaults with same name).
  * Disabled agents (enabled === false) are kept in the registry but excluded from spawning.
  */
 export function registerAgents(userAgents: Map<string, AgentConfig>): void {
   agents.clear();
-
-  // Start with defaults
-  for (const [name, config] of DEFAULT_AGENTS) {
-    agents.set(name, config);
-  }
-
-  // Overlay user agents (overrides defaults with same name)
   for (const [name, config] of userAgents) {
     agents.set(name, config);
   }
@@ -86,20 +77,6 @@ export function getAvailableTypes(): string[] {
 /** Get all type names including disabled (for UI listing). */
 export function getAllTypes(): string[] {
   return [...agents.keys()];
-}
-
-/** Get names of default agents currently in the registry. */
-export function getDefaultAgentNames(): string[] {
-  return [...agents.entries()]
-    .filter(([_, config]) => config.isDefault === true)
-    .map(([name]) => name);
-}
-
-/** Get names of user-defined agents (non-defaults) currently in the registry. */
-export function getUserAgentNames(): string[] {
-  return [...agents.entries()]
-    .filter(([_, config]) => config.isDefault !== true)
-    .map(([name]) => name);
 }
 
 /** Check if a type is valid and enabled (case-insensitive). */
@@ -162,20 +139,7 @@ export function getConfig(type: string): {
     };
   }
 
-  // Fallback for unknown/disabled types — general-purpose config
-  const gp = agents.get("general-purpose");
-  if (gp && gp.enabled !== false) {
-    return {
-      displayName: gp.displayName ?? gp.name,
-      description: gp.description,
-      builtinToolNames: gp.builtinToolNames ?? BUILTIN_TOOL_NAMES,
-      extensions: gp.extensions,
-      skills: gp.skills,
-      promptMode: gp.promptMode,
-    };
-  }
-
-  // Absolute fallback (should never happen)
+  // Fallback for unknown/disabled types
   return {
     displayName: "Agent",
     description: "General-purpose agent for complex, multi-step tasks",

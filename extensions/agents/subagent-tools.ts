@@ -28,8 +28,6 @@ import {
 import {
 	getAgentConfig,
 	getAvailableTypes,
-	getDefaultAgentNames,
-	getUserAgentNames,
 	registerAgents,
 	resolveType,
 } from "./internal/agent-types.js";
@@ -127,21 +125,14 @@ function getModelLabelFromConfig(model: string): string {
 }
 
 function buildTypeListText(): string {
-	const defaultNames = getDefaultAgentNames();
-	const userNames = getUserAgentNames();
-	const defaultDescs = defaultNames.map((name) => {
+	const names = getAvailableTypes();
+	const descs = names.map((name) => {
 		const cfg = getAgentConfig(name);
 		const modelSuffix = cfg?.model ? ` (${getModelLabelFromConfig(cfg.model)})` : "";
 		return `- ${name}: ${cfg?.description ?? name}${modelSuffix}`;
 	});
-	const customDescs = userNames.map((name) => {
-		const cfg = getAgentConfig(name);
-		return `- ${name}: ${cfg?.description ?? name}`;
-	});
 	return [
-		"Default agents:",
-		...defaultDescs,
-		...(customDescs.length > 0 ? ["", "Custom agents:", ...customDescs] : []),
+		...(descs.length > 0 ? ["Custom agents:", ...descs] : ["No agents defined."]),
 		"",
 		"Custom agents defined in .pi/agents/<name>.md (project) or $PI_CODING_AGENT_DIR/agents/<name>.md",
 	].join("\n");

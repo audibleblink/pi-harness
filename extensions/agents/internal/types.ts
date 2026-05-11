@@ -46,8 +46,6 @@ export interface AgentConfig {
   memory?: MemoryScope;
   /** Isolation mode — "worktree" runs the agent in a temporary git worktree */
   isolation?: IsolationMode;
-  /** true = this is an embedded default agent (informational) */
-  isDefault?: boolean;
   /** false = agent is hidden from the registry */
   enabled?: boolean;
   /** Where this agent was loaded from */

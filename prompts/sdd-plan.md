@@ -14,7 +14,8 @@ Create an execution plan, based on a PRD, and save it out to a file: ./plan.md
 - Create and save the execution plan as a file: ./plan.md
 - The entire plan should have multiple phases
 - Be sure to plan in phases, where each leaves a complete, fully functioning, and tested component of code
-- Label phases that are dependent on each other
+- Each phase must be a top-level `## Phase N: <name>` heading
+- Each phase must declare its dependencies on a single line directly under its heading, in the form `**Depends on:** Phase 2, Phase 3` (or `**Depends on:** none`). This is parsed by `sdd-apply` to build the execution DAG.
 - Into each phase, implement a way to check your work so that you know you are done.
   - This could be software testing, computer-use tools, external bash scripts, etc
   - This must be an autonomous feedback loop

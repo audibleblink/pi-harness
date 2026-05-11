@@ -2,63 +2,65 @@
 description: Implement the feature
 ---
 
-Implement the feature
+Implement the feature by parsing the execution plan into a task DAG and executing it via Task* tools.
 
-**Input**: A PRD and Execution Plan
+**Input**: optional paths to context files (PRD, plan, spec dir). If a directory is given (e.g. `./specs/001-feature-x`), use `<dir>/plan.md` as the plan. If no paths are given, default to `./plan.md`.
 
-**Steps**
+## Steps
 
-1. **Read context files**
+1. **Resolve paths and read context**
 
    Read the files:
    - $ARGUMENTS
 
-2. **Implement the next phase**
- 
-   Choose only the next unfinished phase. 
+   Determine the plan path from the inputs (rules above). Call it `PLAN_PATH`.
 
-   - Create a dependency graph from the phase definitions in the execution plan. Use Task* tools to build and execute
-   - Delegate each phase of independent work to a Task using TaskExecute (sub Agent)
-   - Commit each phase on completion within the same subtask
+2. **Build the task DAG**
 
-   For each pending task:
-   - Show which task is being worked on
-   - Make the code changes required using TDD
-   - Keep changes minimal and focused
-   - Validate functionality and correctness
-   - Mark task complete in the tasks file: `- [ ]` → `- [x]`
-   - Continue to next task in the phase
+   Parse `PLAN_PATH`. For each `## Phase N: <name>` heading:
+   - Read its `**Depends on:**` line to find blocking phases.
+   - Call `TaskCreate` with:
+     - `subject`: the phase name
+     - `description`: the full phase body from the plan (the checklist, verification steps, autonomous feedback loop — everything the executing subagent needs), prefixed with a line `Plan file: <PLAN_PATH>` so the subagent knows where to tick checkboxes
+     - `agentType: "general-purpose"`
+   - Record the returned task ID against the phase number.
 
-   **Exit if:**
-   - Phase Complete
+   After all phases are created, call `TaskUpdate` on each to wire `addBlockedBy` with the task IDs of its declared dependency phases.
 
-3. **On completion or pause, show status**
+3. **Launch the roots**
 
-   Display:
-   - Tasks completed this session
-   - Overall progress: "N/M tasks complete"
+   Call `TaskExecute` with the IDs of all phases that have `**Depends on:** none`. Cascade-on-completion will fan out dependents automatically as each phase finishes.
 
-**Output During Implementation**
+   Pass `additional_context` to TaskExecute with:
+   > Implement this phase using TDD. Make minimal, focused changes. Run the phase's autonomous feedback loop until it passes. When the phase is complete, mark each `- [ ]` checkbox for this phase in the plan file (path given in the description) as `- [x]`, then commit all changes with a message naming the phase.
+
+4. **Wait for completion**
+
+   Use `TaskOutput` with `block: true` on each root and (as cascade releases them) each dependent. Surface failures immediately; on failure the cascade will mark the task back to `pending` — do not retry blindly, report the failure and stop.
+
+5. **On completion, show status**
+
+   Use `TaskList` to confirm all phases `completed`. Display:
+   - Phases completed this session
+   - Overall progress: "N/M phases complete"
+
+## Output During Implementation
 
 ```
 ## Implementing: <change-name>
 
-Delegating phase 3/7: <task description>
-[...implementation happening...]
-✓ Task complete
-
-Delegating phase 4/7: <task description>
-[...implementation happening...]
-✓ Task complete
+Built DAG: 7 phases, roots = [Phase 1, Phase 2]
+Launched roots.
+✓ Phase 1 complete → unblocked Phase 3
+✓ Phase 2 complete
+✓ Phase 3 complete → unblocked Phase 4, Phase 5
+...
 ```
 
+## Guardrails
 
-**Guardrails**
-- Keep going through tasks until phase is done or blocked
-- Always read context files before starting
-- If implementation reveals issues, pause and suggest artifact updates
-- Keep code changes minimal and scoped to each task
-- Update task checkbox in the plan immediately after completing each task
-- Each phase is implemented in as subtasks
-- Commit at the end of each phase task
-- Once started, do not stop until all phases are complete
+- Always read context files before building the DAG.
+- Build the **entire** DAG upfront before calling TaskExecute — do not interleave creation and execution.
+- Never spawn an `Agent` tool call for phase work; phases run exclusively through TaskExecute.
+- The executing subagent (not this session) is responsible for editing plan.md checkboxes and committing.
+- If a phase fails (task reverts to `pending`), stop and surface the failure rather than re-executing.
