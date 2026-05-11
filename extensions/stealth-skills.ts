@@ -1,34 +1,21 @@
 /**
- * Stealth Skills Extension
+ * Visible Skills Extension (allowlist)
  *
- * Hides specific skills from the system prompt while keeping them invokable
- * via `/skill:name`. This is the user-side equivalent of putting
- * `disable-model-invocation: true` in a SKILL.md frontmatter, but without
- * editing upstream skill files.
+ * Inverted stealth-skills: only skills listed in `visibleSkills` are
+ * advertised to the model in the system prompt. Every other loaded skill
+ * is marked `disableModelInvocation: true` (hidden from the prompt) but
+ * remains invokable via `/skill:name`.
  *
  * Configuration (global only — `~/.config/pi/agent/settings.json`):
  *
  * ```json
- * { "stealthSkills": ["context7", "browser-use"] }
+ * { "autoSkills": ["pi", "context7"] }
  * ```
  *
- * Why these settings? Pi's `pi config` TUI fully disables skills (also drops
- * them from `/skill:name`); pi's `--no-skills` does the same. There is no
- * built-in way to keep a skill loaded for explicit invocation while hiding
- * its description from the system prompt. This extension fills that gap.
+ * Empty/missing allowlist => hide all skills from the prompt.
  *
- * Mechanics:
- * - On `before_agent_start`, take `systemPromptOptions.skills`, mark every
- *   skill whose name is in `stealthSkills` as `disableModelInvocation: true`,
- *   re-render the skills XML block via `formatSkillsForPrompt`, and replace
- *   the original block in the assembled system prompt.
- * - Skill slash-command registration ignores `disableModelInvocation`, so
- *   `/skill:name` keeps working for hidden skills (verified in
- *   pi-coding-agent/dist/core/skills.js).
- *
- * The `/skills` command opens an interactive selector to toggle which skills
- * are hidden. Changes persist to global settings.json and take effect on
- * the next pi restart (settings are read once at session_start).
+ * The `/skills` command opens an interactive allowlist picker. Changes
+ * persist to global settings.json and take effect on the next pi restart.
  */
 
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
@@ -44,18 +31,14 @@ import {
 import { Container, matchesKey, type SelectItem, SelectList, Text } from "@mariozechner/pi-tui";
 
 interface SettingsShape {
-	stealthSkills?: string[];
+	autoSkills?: string[];
 	[key: string]: unknown;
 }
 
-const SETTING_KEY = "stealthSkills";
+const SETTING_KEY = "autoSkills";
 
 export default function (pi: ExtensionAPI) {
-	// Read once at session_start; changes apply on restart.
-	let stealthSet = new Set<string>();
-	// Cache the most recent skill list seen via before_agent_start, so /skills
-	// can populate its picker. Empty until the first agent turn — in that
-	// case we tell the user to send any prompt first.
+	let visibleSet = new Set<string>();
 	let knownSkills: Skill[] = [];
 
 	function settingsPath(): string {
@@ -79,43 +62,44 @@ export default function (pi: ExtensionAPI) {
 		renameSync(tmp, path);
 	}
 
-	function loadStealthSet(): Set<string> {
+	function loadVisibleSet(): Set<string> {
 		const value = readSettings()[SETTING_KEY];
 		if (!Array.isArray(value)) return new Set();
 		return new Set(value.filter((v): v is string => typeof v === "string"));
 	}
 
-	function persistStealthSet(set: Set<string>): void {
+	function persistVisibleSet(set: Set<string>): void {
 		const current = readSettings();
 		current[SETTING_KEY] = Array.from(set).sort();
 		writeSettings(current);
 	}
 
 	pi.on("session_start", () => {
-		stealthSet = loadStealthSet();
+		visibleSet = loadVisibleSet();
 	});
 
 	pi.on("before_agent_start", (event) => {
 		const skills = event.systemPromptOptions.skills ?? [];
 		knownSkills = skills;
-		if (stealthSet.size === 0 || skills.length === 0) return;
+		if (skills.length === 0) return;
 
 		const original = formatSkillsForPrompt(skills);
 		if (!original) return;
 
+		// Hide every skill NOT in the allowlist.
 		const filtered = skills.map((s) =>
-			stealthSet.has(s.name) ? { ...s, disableModelInvocation: true } : s,
+			visibleSet.has(s.name) ? s : { ...s, disableModelInvocation: true },
 		);
 		const replacement = formatSkillsForPrompt(filtered);
 
-		if (!event.systemPrompt.includes(original)) return; // unexpected — bail safely
+		if (!event.systemPrompt.includes(original)) return;
 		const newPrompt = event.systemPrompt.replace(original, replacement);
 		if (newPrompt === event.systemPrompt) return;
 		return { systemPrompt: newPrompt };
 	});
 
 	pi.registerCommand("skills", {
-		description: "Toggle which skills are hidden from the system prompt (kept invokable via /skill:name)",
+		description: "Toggle which skills are advertised in the system prompt (others stay invokable via /skill:name)",
 		handler: async (_args, ctx) => {
 			if (knownSkills.length === 0) {
 				ctx.ui.notify(
@@ -129,27 +113,23 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	async function showSkillsPicker(ctx: ExtensionContext): Promise<void> {
-		// Operate on a working copy so changes are atomic per session.
-		const working = new Set(stealthSet);
+		const working = new Set(visibleSet);
 		const sorted = [...knownSkills].sort((a, b) => a.name.localeCompare(b.name));
 
 		const result = await ctx.ui.custom<"save" | "cancel">((tui, theme, _kb, done) => {
 			const container = new Container();
 			container.addChild(new DynamicBorder((str) => theme.fg("accent", str)));
 			container.addChild(
-				new Text(theme.fg("accent", theme.bold("Stealth Skills — toggle prompt visibility"))),
+				new Text(theme.fg("accent", theme.bold("Visible Skills — allowlist for system prompt"))),
 			);
 
 			function labelFor(name: string): string {
 				return `${working.has(name) ? "[x]" : "[ ]"} ${name}`;
 			}
 			function descFor(name: string): string {
-				return working.has(name) ? "hidden from prompt" : "visible in prompt";
+				return working.has(name) ? "visible in prompt" : "hidden from prompt";
 			}
 
-			// SelectList mutates this array in place; we keep the same reference and
-			// edit individual items' label/description on toggle so the rendered list
-			// updates without rebuilding the component.
 			const liveItems: SelectItem[] = sorted.map((skill) => ({
 				value: skill.name,
 				label: labelFor(skill.name),
@@ -164,8 +144,6 @@ export default function (pi: ExtensionAPI) {
 				scrollInfo: (text: string) => theme.fg("dim", text),
 				noMatch: (text: string) => theme.fg("warning", text),
 			});
-			// Disarm SelectList's own enter/esc handlers — we drive completion ourselves
-			// from the outer handleInput so space=toggle and enter=save are unambiguous.
 			selectList.onSelect = () => {};
 			selectList.onCancel = () => {};
 
@@ -213,19 +191,19 @@ export default function (pi: ExtensionAPI) {
 		});
 
 		if (result === "cancel") {
-			ctx.ui.notify("Stealth skills: changes discarded", "info");
+			ctx.ui.notify("Visible skills: changes discarded", "info");
 			return;
 		}
 
-		const removed = [...stealthSet].filter((n) => !working.has(n));
-		const added = [...working].filter((n) => !stealthSet.has(n));
+		const removed = [...visibleSet].filter((n) => !working.has(n));
+		const added = [...working].filter((n) => !visibleSet.has(n));
 		if (added.length + removed.length === 0) {
-			ctx.ui.notify("Stealth skills: no changes", "info");
+			ctx.ui.notify("Visible skills: no changes", "info");
 			return;
 		}
-		persistStealthSet(working);
+		persistVisibleSet(working);
 		ctx.ui.notify(
-			`Stealth skills updated (+${added.length} / -${removed.length}). Restart pi for changes to take effect.`,
+			`Visible skills updated (+${added.length} / -${removed.length}). Restart pi for changes to take effect.`,
 			"info",
 		);
 	}
