@@ -99,8 +99,10 @@ export default function (pi: ExtensionAPI) {
 		// Hide every skill NOT in the allowlist. Active primary agent (if any)
 		// overrides the persisted set for the duration it's active.
 		const effective = agentOverride ?? visibleSet;
+		const projectSkillsDir = join(process.cwd(), ".pi") + "/";
+		const isProjectLocal = (s: Skill): boolean => s.filePath.startsWith(projectSkillsDir);
 		const filtered = skills.map((s) =>
-			effective.has(s.name) ? s : { ...s, disableModelInvocation: true },
+			effective.has(s.name) || isProjectLocal(s) ? s : { ...s, disableModelInvocation: true },
 		);
 		const replacement = formatSkillsForPrompt(filtered);
 
