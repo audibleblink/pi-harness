@@ -10,7 +10,7 @@
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { getSpawnFn, setRetainAgentFn } from "../_shared/spawn-bridge.js";
+import { getSpawnFn, setRetainAgentFn, setTasksSnapshotFn } from "../_shared/spawn-bridge.js";
 import { getTaskByAgent } from "./store.js";
 import { publishOrchestration } from "../ui/bus.js";
 import type { OrchestrationState } from "../ui/bus.js";
@@ -119,6 +119,14 @@ export default function (pi: ExtensionAPI) {
     const taskId = getTaskByAgent(agentId);
     return !!taskId && !!store.get(taskId);
   });
+
+  // Expose a snapshot for /agents (consumed by extensions/agents/).
+  setTasksSnapshotFn(() => store.list().map(t => ({
+    id: t.id,
+    subject: t.subject,
+    status: t.status,
+    agentId: t.metadata?.agentId as string | undefined,
+  })));
 
   registerCreate(pi, deps);
   registerList(pi, deps);

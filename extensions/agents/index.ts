@@ -17,6 +17,7 @@ import {
 	updateStatus,
 } from "./primary.js";
 import { registerCommands } from "./commands.js";
+import { registerStatusCommand } from "./status-command.js";
 import { registerCycling } from "./cycling.js";
 import { createSubagentRuntime } from "./subagent-runner.js";
 import { registerSubagentTools } from "./subagent-tools.js";
@@ -64,6 +65,7 @@ export default function agentsExtension(pi: ExtensionAPI) {
 	// Subagent tools (Agent, get_subagent_result, steer_subagent) + lifecycle.
 	const subagentRuntime = createSubagentRuntime(pi);
 	registerSubagentTools(pi, subagentRuntime, () => state.activeAgent?.permission);
+	registerStatusCommand(pi, subagentRuntime);
 	// Bridge-spawned agents (TaskExecute + cascade) are routed through the same
 	// background-completion notifier as the Agent tool, so the parent receives
 	// a `subagent-notification` followUp when each finishes — no polling.

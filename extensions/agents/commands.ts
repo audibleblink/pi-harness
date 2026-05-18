@@ -1,6 +1,7 @@
 /**
- * Slash commands for extensions/agents/: `/agent` and `/agents` (selector +
- * direct-switch). Surface unchanged from modes.ts.
+ * Slash command `/agent` (selector + direct-switch) for primary-agent
+ * switching. `/agents` is a separate status command registered from
+ * agents/index.ts so it can see the subagent runtime.
  */
 
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
@@ -108,5 +109,4 @@ function makeHandler(pi: ExtensionAPI, state: AgentsState) {
 export function registerCommands(pi: ExtensionAPI, state: AgentsState): void {
 	const handler = makeHandler(pi, state);
 	pi.registerCommand("agent", { description: "Switch active agent", handler });
-	pi.registerCommand("agents", { description: "Switch active agent", handler });
 }

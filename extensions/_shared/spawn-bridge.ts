@@ -23,8 +23,20 @@ export type SpawnFn = (
  */
 export type RetainAgentFn = (agentId: string) => boolean;
 
+/**
+ * Lightweight read-only view of the task store, published by tasks/ so
+ * agents/ can surface tasks alongside running subagents in /agents.
+ */
+export type TaskSnapshot = {
+  id: string;
+  subject: string;
+  status: string;
+  agentId?: string;
+};
+export type TasksSnapshotFn = () => TaskSnapshot[];
+
 const KEY = Symbol.for("pi-harness.spawn-bridge");
-type Slot = { fn?: SpawnFn; retain?: RetainAgentFn };
+type Slot = { fn?: SpawnFn; retain?: RetainAgentFn; tasks?: TasksSnapshotFn };
 const slot: Slot = ((globalThis as any)[KEY] ??= {});
 
 export function setSpawnFn(fn: SpawnFn): void {
@@ -41,4 +53,12 @@ export function setRetainAgentFn(fn: RetainAgentFn | undefined): void {
 
 export function getRetainAgentFn(): RetainAgentFn | undefined {
   return slot.retain;
+}
+
+export function setTasksSnapshotFn(fn: TasksSnapshotFn | undefined): void {
+  slot.tasks = fn;
+}
+
+export function getTasksSnapshotFn(): TasksSnapshotFn | undefined {
+  return slot.tasks;
 }
