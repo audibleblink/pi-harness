@@ -10,6 +10,7 @@
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import { getSpawnFn } from "../_spawn-bridge.js";
 import { publishOrchestration } from "../ui/bus.js";
 import type { OrchestrationState } from "../ui/bus.js";
 import { AutoClearManager } from "./auto-clear.js";
@@ -94,10 +95,11 @@ export default function (pi: ExtensionAPI) {
     publishTimer = setTimeout(flushPublish, 50);
   }
 
-  // P5: spawn callback is a stub — TaskExecute returns "not implemented" until P6 wires
-  // a runner via the agents/ extension event bus.
-  const spawn: TaskDeps["spawn"] = (_agentType, _prompt, _opts) => {
-    throw new Error("TaskExecute spawn not yet wired (P6 cascade)");
+  // Delegates to agents/ subagent runtime via the spawn bridge.
+  const spawn: TaskDeps["spawn"] = (agentType, prompt, opts) => {
+    const fn = getSpawnFn();
+    if (!fn) throw new Error("agents/ extension not loaded — TaskExecute requires it");
+    return fn(agentType, prompt, opts);
   };
 
   const deps: TaskDeps = {

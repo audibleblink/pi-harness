@@ -23,6 +23,7 @@ import { registerSubagentTools } from "./subagent-tools.js";
 import { extractAtDispatches } from "./at-dispatch.js";
 import { createAgentAtAutocompleteFactory } from "./at-autocomplete.js";
 import { dispatchSpawn, PERMISSION_ASK_EVENT, type PermissionAskPayload } from "./spawn.js";
+import { setSpawnFn } from "../_spawn-bridge.js";
 import type { AgentDef } from "../_agent-schema/types.js";
 
 interface Settings {
@@ -63,6 +64,7 @@ export default function agentsExtension(pi: ExtensionAPI) {
 	// Subagent tools (Agent, get_subagent_result, steer_subagent) + lifecycle.
 	const subagentRuntime = createSubagentRuntime(pi);
 	registerSubagentTools(pi, subagentRuntime, () => state.activeAgent?.permission);
+	setSpawnFn((type, prompt, opts) => subagentRuntime.spawn(type, prompt, opts));
 
 	pi.on("session_shutdown", async () => {
 		subagentRuntime.dispose();
