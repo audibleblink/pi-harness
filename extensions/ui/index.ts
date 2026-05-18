@@ -8,7 +8,7 @@
  */
 
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { UI_BUS_TOPIC, SLOT_MODE, SLOT_ORCHESTRATION, SLOT_SUBAGENT_USAGE, SLOT_BLUR, type UiBusEnvelope, type OrchestrationState, type SubagentUsageState } from "./bus.js";
+import { UI_BUS_TOPIC, SLOT_MODE, SLOT_ORCHESTRATION, SLOT_ORCHESTRATION_AGENTS, SLOT_ORCHESTRATION_TASKS, SLOT_SUBAGENT_USAGE, SLOT_BLUR, type UiBusEnvelope, type AgentEntry, type TaskEntry, type OrchestrationState, type SubagentUsageState } from "./bus.js";
 import { setupFooter, type FooterHandle } from "./footer.js";
 import { registerEditor } from "./editor.js";
 import { setupWorking } from "./working.js";
@@ -28,9 +28,16 @@ export default function uiExtension(pi: ExtensionAPI) {
 		renderAndSetWidget();
 	});
 
+	function mergedOrchestration(): OrchestrationState | null {
+		const agents = (slots.get(SLOT_ORCHESTRATION_AGENTS) as AgentEntry[] | null | undefined) ?? [];
+		const tasks = (slots.get(SLOT_ORCHESTRATION_TASKS) as TaskEntry[] | null | undefined) ?? [];
+		if (agents.length === 0 && tasks.length === 0) return null;
+		return { agents, tasks };
+	}
+
 	function renderAndSetWidget(): void {
 		if (!currentCtx) return;
-		const state = slots.get(SLOT_ORCHESTRATION) as OrchestrationState | null | undefined;
+		const state = mergedOrchestration();
 		if (!state) {
 			currentCtx.ui.setWidget(SLOT_ORCHESTRATION, undefined);
 			return;
@@ -41,8 +48,8 @@ export default function uiExtension(pi: ExtensionAPI) {
 	}
 
 	function onSlotChanged(slot: string): void {
-		if (slot === SLOT_ORCHESTRATION) {
-			const state = slots.get(SLOT_ORCHESTRATION) as OrchestrationState | null | undefined;
+		if (slot === SLOT_ORCHESTRATION_AGENTS || slot === SLOT_ORCHESTRATION_TASKS) {
+			const state = mergedOrchestration();
 			if (!state || !hasAnimatedState(state)) {
 				ticker.stop();
 			} else if (!ticker.isRunning()) {

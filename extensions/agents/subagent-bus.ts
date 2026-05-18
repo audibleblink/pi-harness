@@ -2,20 +2,20 @@
  * Debounced UIBus publishers for the agents/ subagent runtime.
  *
  * Mirrors the publish points used by extensions/orchestration/ today:
- *   - publishOrchestration  ← scheduled on every state change
+ *   - publishOrchestrationAgents ← scheduled on every state change (agents half-slot)
  *   - publishSubagentUsage  ← suppressed when the value is unchanged
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import {
-	publishOrchestration,
+	publishOrchestrationAgents,
 	publishSubagentUsage,
-	type OrchestrationState,
+	type AgentEntry,
 	type SubagentUsageState,
 } from "../ui/bus.js";
 
 export interface PublishHooks {
-	buildOrchestration: () => OrchestrationState;
+	buildAgents: () => AgentEntry[];
 	buildSubagentUsage: () => SubagentUsageState | null;
 }
 
@@ -39,7 +39,7 @@ export function createPublisher(pi: ExtensionAPI, hooks: PublishHooks): Publishe
 
 	const flush = () => {
 		timer = undefined;
-		publishOrchestration(pi, hooks.buildOrchestration());
+		publishOrchestrationAgents(pi, hooks.buildAgents());
 		const sub = hooks.buildSubagentUsage();
 		if (!equal(sub, last)) {
 			last = sub;

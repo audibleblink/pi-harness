@@ -23,7 +23,7 @@ import type {
 	NotificationDetails,
 	SubagentType,
 } from "./internal/types.js";
-import type { OrchestrationState, SubagentUsageState } from "../ui/bus.js";
+import type { AgentEntry, SubagentUsageState } from "../ui/bus.js";
 import { createPublisher } from "./subagent-bus.js";
 import {
 	AGENTS_SUBAGENT_END,
@@ -152,8 +152,8 @@ export function createSubagentRuntime(pi: ExtensionAPI): SubagentRuntime {
 	let batchCounter = 0;
 	let defaultJoinMode: JoinMode = "smart";
 
-	const buildOrchestration = (): OrchestrationState => {
-		const agents = manager.listAgents()
+	const buildAgents = (): AgentEntry[] => {
+		return manager.listAgents()
 			.filter(a => a.status === "running" || a.status === "queued")
 			.map(a => {
 				const act = agentActivity.get(a.id);
@@ -165,7 +165,6 @@ export function createSubagentRuntime(pi: ExtensionAPI): SubagentRuntime {
 					taskId: undefined as string | undefined,
 				};
 			});
-		return { agents, tasks: [] };
 	};
 
 	const buildSubagentUsage = (): SubagentUsageState | null => {
@@ -187,7 +186,7 @@ export function createSubagentRuntime(pi: ExtensionAPI): SubagentRuntime {
 		return any ? { tokens, cost, runningCount } : null;
 	};
 
-	const publisher = createPublisher(pi, { buildOrchestration, buildSubagentUsage });
+	const publisher = createPublisher(pi, { buildAgents, buildSubagentUsage });
 
 	function scheduleNudge(key: string, send: () => void, delay = NUDGE_HOLD_MS) {
 		cancelNudge(key);

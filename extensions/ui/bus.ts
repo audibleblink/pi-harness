@@ -15,7 +15,12 @@ export const UI_BUS_TOPIC = "harness.ui:publish";
 // ─── Slot names ───────────────────────────────────────────────────────────────
 
 export const SLOT_MODE = "mode";
+/** Combined render slot — used as the chrome widget identifier only. Producers no longer write to it. */
 export const SLOT_ORCHESTRATION = "orchestration";
+/** Half-slot: published by extensions/agents/ with live subagent records. */
+export const SLOT_ORCHESTRATION_AGENTS = "orchestration:agents";
+/** Half-slot: published by extensions/tasks/ with live task records. */
+export const SLOT_ORCHESTRATION_TASKS = "orchestration:tasks";
 export const SLOT_WORKING = "working";
 export const SLOT_SUBAGENT_USAGE = "subagentUsage";
 export const SLOT_GHOST = "ghost";
@@ -80,8 +85,12 @@ export function publishMode(pi: ExtensionAPI, state: ModeState | null): void {
 	pi.events.emit(UI_BUS_TOPIC, { slot: SLOT_MODE, value: state } satisfies UiBusEnvelope);
 }
 
-export function publishOrchestration(pi: ExtensionAPI, state: OrchestrationState | null): void {
-	pi.events.emit(UI_BUS_TOPIC, { slot: SLOT_ORCHESTRATION, value: state } satisfies UiBusEnvelope);
+export function publishOrchestrationAgents(pi: ExtensionAPI, agents: AgentEntry[] | null): void {
+	pi.events.emit(UI_BUS_TOPIC, { slot: SLOT_ORCHESTRATION_AGENTS, value: agents } satisfies UiBusEnvelope);
+}
+
+export function publishOrchestrationTasks(pi: ExtensionAPI, tasks: TaskEntry[] | null): void {
+	pi.events.emit(UI_BUS_TOPIC, { slot: SLOT_ORCHESTRATION_TASKS, value: tasks } satisfies UiBusEnvelope);
 }
 
 export function publishWorking(pi: ExtensionAPI, state: WorkingState | null): void {

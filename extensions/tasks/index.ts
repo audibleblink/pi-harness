@@ -12,8 +12,8 @@ import { join, resolve } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { getSpawnFn, setRetainAgentFn, setTasksSnapshotFn } from "../_shared/spawn-bridge.js";
 import { getTaskByAgent } from "./store.js";
-import { publishOrchestration } from "../ui/bus.js";
-import type { OrchestrationState } from "../ui/bus.js";
+import { publishOrchestrationTasks } from "../ui/bus.js";
+import type { TaskEntry } from "../ui/bus.js";
 import { AutoClearManager } from "./auto-clear.js";
 import { registerCascade } from "./cascade.js";
 import { TaskStore } from "./store.js";
@@ -76,19 +76,18 @@ export default function (pi: ExtensionAPI) {
 
   let publishTimer: ReturnType<typeof setTimeout> | undefined;
 
-  function buildOrchestrationState(): OrchestrationState {
-    const tasks = store.list().map(t => ({
+  function buildTasksState(): TaskEntry[] {
+    return store.list().map(t => ({
       id: t.id,
       subject: t.subject,
       status: t.status,
       agentId: t.metadata?.agentId as string | undefined,
     }));
-    return { agents: [], tasks };
   }
 
   function flushPublish() {
     publishTimer = undefined;
-    publishOrchestration(pi, buildOrchestrationState());
+    publishOrchestrationTasks(pi, buildTasksState());
   }
 
   function schedulePublish() {
