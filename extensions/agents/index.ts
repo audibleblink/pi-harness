@@ -23,7 +23,7 @@ import { registerSubagentTools } from "./subagent-tools.js";
 import { extractAtDispatches } from "./at-dispatch.js";
 import { createAgentAtAutocompleteFactory } from "./at-autocomplete.js";
 import { dispatchSpawn, PERMISSION_ASK_EVENT, type PermissionAskPayload } from "./spawn.js";
-import { setSpawnFn } from "../_spawn-bridge.js";
+import { setSpawnFn } from "../_shared/spawn-bridge.js";
 import type { AgentDef } from "../_agent-schema/types.js";
 
 interface Settings {

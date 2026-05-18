@@ -10,7 +10,7 @@
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { getSpawnFn } from "../_spawn-bridge.js";
+import { getSpawnFn } from "../_shared/spawn-bridge.js";
 import { publishOrchestration } from "../ui/bus.js";
 import type { OrchestrationState } from "../ui/bus.js";
 import { AutoClearManager } from "./auto-clear.js";
