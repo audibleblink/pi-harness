@@ -15,8 +15,16 @@ export type SpawnFn = (
   opts: { description: string; isBackground: boolean; maxTurns?: number },
 ) => string;
 
+/**
+ * Predicate consulted by AgentManager.cleanup(): when it returns true for an
+ * agent id, that agent record is kept past the normal 10-minute eviction.
+ * tasks/ installs this so subagents bound to live tasks aren't reaped while
+ * a long-running DAG is still polling them via get_subagent_result.
+ */
+export type RetainAgentFn = (agentId: string) => boolean;
+
 const KEY = Symbol.for("pi-harness.spawn-bridge");
-type Slot = { fn?: SpawnFn };
+type Slot = { fn?: SpawnFn; retain?: RetainAgentFn };
 const slot: Slot = ((globalThis as any)[KEY] ??= {});
 
 export function setSpawnFn(fn: SpawnFn): void {
@@ -25,4 +33,12 @@ export function setSpawnFn(fn: SpawnFn): void {
 
 export function getSpawnFn(): SpawnFn | undefined {
   return slot.fn;
+}
+
+export function setRetainAgentFn(fn: RetainAgentFn | undefined): void {
+  slot.retain = fn;
+}
+
+export function getRetainAgentFn(): RetainAgentFn | undefined {
+  return slot.retain;
 }

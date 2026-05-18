@@ -10,7 +10,8 @@
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { getSpawnFn } from "../_shared/spawn-bridge.js";
+import { getSpawnFn, setRetainAgentFn } from "../_shared/spawn-bridge.js";
+import { getTaskByAgent } from "./store.js";
 import { publishOrchestration } from "../ui/bus.js";
 import type { OrchestrationState } from "../ui/bus.js";
 import { AutoClearManager } from "./auto-clear.js";
@@ -110,6 +111,14 @@ export default function (pi: ExtensionAPI) {
     spawn,
     setCascadeConfig: (c) => { cascadeConfig = c; },
   };
+
+  // Keep agent records alive as long as their bound task still exists in the
+  // store — prevents AgentManager's 10-min cleanup from evicting subagents
+  // that a long-running TaskExecute DAG hasn't gotten around to inspecting.
+  setRetainAgentFn((agentId) => {
+    const taskId = getTaskByAgent(agentId);
+    return !!taskId && !!store.get(taskId);
+  });
 
   registerCreate(pi, deps);
   registerList(pi, deps);

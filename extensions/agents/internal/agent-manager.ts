@@ -73,6 +73,8 @@ export class AgentManager {
   private onComplete?: OnAgentComplete;
   private onStart?: OnAgentStart;
   private maxConcurrent: number;
+  /** Optional predicate: if returns true for an agent id, cleanup() skips eviction. */
+  private shouldRetain?: (agentId: string) => boolean;
 
   /** Queue of background agents waiting to start. */
   private queue: { id: string; args: SpawnArgs }[] = [];
@@ -340,11 +342,17 @@ export class AgentManager {
     this.agents.delete(id);
   }
 
+  /** Install a retention predicate consulted by cleanup(). */
+  setRetentionPredicate(fn: ((agentId: string) => boolean) | undefined): void {
+    this.shouldRetain = fn;
+  }
+
   private cleanup() {
     const cutoff = Date.now() - 10 * 60_000;
     for (const [id, record] of this.agents) {
       if (record.status === "running" || record.status === "queued") continue;
       if ((record.completedAt ?? 0) >= cutoff) continue;
+      if (this.shouldRetain?.(id)) continue;
       this.removeRecord(id, record);
     }
   }

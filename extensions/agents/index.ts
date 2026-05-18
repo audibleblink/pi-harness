@@ -23,7 +23,7 @@ import { registerSubagentTools } from "./subagent-tools.js";
 import { extractAtDispatches } from "./at-dispatch.js";
 import { createAgentAtAutocompleteFactory } from "./at-autocomplete.js";
 import { dispatchSpawn, PERMISSION_ASK_EVENT, type PermissionAskPayload } from "./spawn.js";
-import { setSpawnFn } from "../_shared/spawn-bridge.js";
+import { getRetainAgentFn, setSpawnFn } from "../_shared/spawn-bridge.js";
 import type { AgentDef } from "../_agent-schema/types.js";
 
 interface Settings {
@@ -65,6 +65,8 @@ export default function agentsExtension(pi: ExtensionAPI) {
 	const subagentRuntime = createSubagentRuntime(pi);
 	registerSubagentTools(pi, subagentRuntime, () => state.activeAgent?.permission);
 	setSpawnFn((type, prompt, opts) => subagentRuntime.spawn(type, prompt, opts));
+	// Defer to whatever predicate tasks/ has installed (may change at any time).
+	subagentRuntime.manager.setRetentionPredicate((id) => getRetainAgentFn()?.(id) === true);
 
 	pi.on("session_shutdown", async () => {
 		subagentRuntime.dispose();
