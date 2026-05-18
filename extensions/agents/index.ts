@@ -64,7 +64,14 @@ export default function agentsExtension(pi: ExtensionAPI) {
 	// Subagent tools (Agent, get_subagent_result, steer_subagent) + lifecycle.
 	const subagentRuntime = createSubagentRuntime(pi);
 	registerSubagentTools(pi, subagentRuntime, () => state.activeAgent?.permission);
-	setSpawnFn((type, prompt, opts) => subagentRuntime.spawn(type, prompt, opts));
+	// Bridge-spawned agents (TaskExecute + cascade) are routed through the same
+	// background-completion notifier as the Agent tool, so the parent receives
+	// a `subagent-notification` followUp when each finishes — no polling.
+	setSpawnFn((type, prompt, opts) => {
+		const id = subagentRuntime.spawn(type, prompt, opts);
+		subagentRuntime.registerBackgroundAgent(id, "smart");
+		return id;
+	});
 	// Defer to whatever predicate tasks/ has installed (may change at any time).
 	subagentRuntime.manager.setRetentionPredicate((id) => getRetainAgentFn()?.(id) === true);
 

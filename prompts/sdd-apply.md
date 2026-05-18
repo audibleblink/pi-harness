@@ -34,9 +34,15 @@ Implement the feature by parsing the execution plan into a task DAG and executin
    Pass `additional_context` to TaskExecute with:
    > Implement this phase using TDD. Make minimal, focused changes. Run the phase's autonomous feedback loop until it passes. When the phase is complete, mark each `- [ ]` checkbox for this phase in the plan file (path given in the description) as `- [x]`, then commit all changes with a message naming the phase.
 
-4. **Wait for completion**
+4. **Wait for completion (event-driven, no polling)**
 
-   Use `TaskOutput` with `block: true` on each root and (as cascade releases them) each dependent. Surface failures immediately; on failure the cascade will mark the task back to `pending` — do not retry blindly, report the failure and stop.
+   Stop after launching the roots. Do not call `TaskOutput` or `get_subagent_result` in a loop. Each time a subagent finishes you will receive a `subagent-notification` followUp message that wakes you for a new turn. On every wakeup:
+
+   - Call `TaskList` once to see current statuses.
+   - If any task moved back to `pending` with `lastError` metadata, that phase failed — surface the failure and stop. Do not retry blindly.
+   - Otherwise do nothing; the cascade auto-launches newly-unblocked dependents.
+
+   Repeat until `TaskList` shows every phase `completed`.
 
 5. **On completion, show status**
 
