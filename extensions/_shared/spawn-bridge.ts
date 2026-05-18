@@ -3,7 +3,10 @@
  * so tasks/ (TaskExecute, cascade) can launch agents without importing
  * agents/'s internals directly.
  *
- * Set once during agents/ extension init; read on demand by tasks/.
+ * pi's extension loader runs jiti with `moduleCache: false`, so each
+ * extension gets its OWN copy of every imported helper module. Module-scope
+ * state therefore cannot be shared between extensions — we keep the spawn
+ * function on a globalThis-keyed slot instead.
  */
 
 export type SpawnFn = (
@@ -12,12 +15,14 @@ export type SpawnFn = (
   opts: { description: string; isBackground: boolean; maxTurns?: number },
 ) => string;
 
-let spawnFn: SpawnFn | undefined;
+const KEY = Symbol.for("pi-harness.spawn-bridge");
+type Slot = { fn?: SpawnFn };
+const slot: Slot = ((globalThis as any)[KEY] ??= {});
 
 export function setSpawnFn(fn: SpawnFn): void {
-  spawnFn = fn;
+  slot.fn = fn;
 }
 
 export function getSpawnFn(): SpawnFn | undefined {
-  return spawnFn;
+  return slot.fn;
 }
