@@ -7,10 +7,15 @@
  * restore the working tree to that snapshot.
  */
 
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 
 export default function (pi: ExtensionAPI) {
 	const checkpoints = new Map<string, string>();
+	// ponytail: private per-process index so concurrent agents in the same repo
+	// never contend on .git/index.lock and never clobber the user's staging area.
+	const idxFile = join(tmpdir(), `pi-checkpoint-${process.pid}.index`);
 	let gitDisabled = false;
 	let gitChecked = false;
 
@@ -32,10 +37,10 @@ export default function (pi: ExtensionAPI) {
 		if (!leaf) return;
 
 		try {
-			await pi.exec("git", ["add", "-A"]);
-			const { stdout } = await pi.exec("git", ["write-tree"]);
+			const gitEnv = `GIT_INDEX_FILE=${idxFile}`;
+			await pi.exec("env", [gitEnv, "git", "add", "-A"]);
+			const { stdout } = await pi.exec("env", [gitEnv, "git", "write-tree"]);
 			const tree = stdout.trim();
-			await pi.exec("git", ["reset"]);
 			if (tree) checkpoints.set(leaf.id, tree);
 		} catch {
 			// snapshot failure is non-fatal; skip this turn
